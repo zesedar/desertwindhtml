@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Desert Wind">
+<meta name="application-name" content="Desert Wind">
+<meta name="theme-color" content="#ffb000">
+<meta name="description" content="Desert Wind - Retro CRT terminál kalandjáték">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Desert Wind</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
@@ -409,6 +418,33 @@
 // DESERT WIND - JavaScript konverzió (Act 1)
 // Eredeti: Turbo Pascal - FoD Softworks
 // ============================================================
+
+// --- PWA SERVICE WORKER REGISZTRÁCIÓ ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then((reg) => console.log('[PWA] Service Worker regisztrálva:', reg.scope))
+      .catch((err) => console.warn('[PWA] SW regisztráció sikertelen:', err));
+  });
+}
+
+// --- PWA TELEPÍTÉS PROMPT (opcionális) ---
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  console.log('[PWA] Telepítés elérhető. Hívd meg: window.installPWA()');
+});
+window.installPWA = function() {
+  if (!deferredInstallPrompt) {
+    console.log('[PWA] Nincs telepítési prompt elérhető.');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(() => {
+    deferredInstallPrompt = null;
+  });
+};
 
 // --- INTRO RAJZOLÁS (hű az eredeti Pascal grafikához) ---
 const introCanvas = document.getElementById('intro-canvas');
