@@ -1,0 +1,3441 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Desert Wind</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap');
+
+  :root {
+    --amber: #ffb000;
+    --amber-dim: #996a00;
+    --amber-bright: #ffd966;
+    --bg: #1a1205;
+    --bg-screen: #0d0a03;
+    --scanline: rgba(0,0,0,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    font-family: 'VT323', monospace;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  #monitor {
+    width: 800px;
+    max-width: 95vw;
+    height: 92vh;
+    height: 92dvh;
+    background: var(--bg);
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow:
+      0 0 60px rgba(255,176,0,0.08),
+      inset 0 0 80px rgba(0,0,0,0.6);
+    position: relative;
+  }
+
+  #screen {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-screen);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #screen::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      var(--scanline) 0px,
+      var(--scanline) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #screen::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.45) 100%);
+    pointer-events: none;
+    z-index: 11;
+  }
+
+  #output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    color: var(--amber);
+    font-size: 18px;
+    line-height: 1.5;
+    scrollbar-width: thin;
+    scrollbar-color: var(--amber-dim) transparent;
+  }
+
+  #output::-webkit-scrollbar { width: 6px; }
+  #output::-webkit-scrollbar-track { background: transparent; }
+  #output::-webkit-scrollbar-thumb { background: var(--amber-dim); border-radius: 3px; }
+
+  .line { margin-bottom: 2px; white-space: pre-wrap; word-wrap: break-word; }
+  .line.empty { height: 12px; }
+  .line.title {
+    color: var(--amber-bright);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    text-align: center;
+    margin: 8px 0;
+    text-shadow: 0 0 10px rgba(255,176,0,0.5);
+  }
+  .line.death { color: #ff4444; text-shadow: 0 0 8px rgba(255,0,0,0.4); }
+  .line.success { color: #44ff44; text-shadow: 0 0 8px rgba(0,255,0,0.3); }
+  .line.system { color: var(--amber-dim); font-style: italic; }
+
+  #input-area {
+    display: flex;
+    align-items: center;
+    padding: 8px 20px 14px;
+    border-top: 1px solid rgba(255,176,0,0.1);
+    background: rgba(0,0,0,0.3);
+  }
+
+  #prompt {
+    color: var(--amber-bright);
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    margin-right: 4px;
+    white-space: nowrap;
+    text-shadow: 0 0 6px rgba(255,176,0,0.4);
+  }
+
+  #cmd {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--amber-bright);
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    caret-color: var(--amber-bright);
+    text-shadow: 0 0 4px rgba(255,176,0,0.3);
+  }
+
+  #cmd::placeholder { color: var(--amber-dim); }
+
+  #sidebar {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 220px;
+    background: rgba(13,10,3,0.95);
+    border: 1px solid var(--amber-dim);
+    border-radius: 8px;
+    padding: 12px;
+    color: var(--amber);
+    font-family: 'VT323', monospace;
+    font-size: 15px;
+    z-index: 100;
+    display: none;
+  }
+
+  #sidebar h3 {
+    color: var(--amber-bright);
+    font-size: 16px;
+    margin-bottom: 8px;
+    text-align: center;
+    border-bottom: 1px solid var(--amber-dim);
+    padding-bottom: 4px;
+  }
+
+  #sidebar ul { list-style: none; padding: 0; }
+  #sidebar li { padding: 2px 0; }
+  #sidebar li:empty::after { content: '(üres)'; color: var(--amber-dim); }
+
+  /* CRT scanline effect without flicker */
+  #screen { /* animation removed */ }
+
+  #intro-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #000;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  #intro-canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  /* --- Mobile Action Bar --- */
+  #mobile-bar {
+    display: none;
+    padding: 6px 8px;
+    background: rgba(0,0,0,0.5);
+    border-top: 1px solid rgba(255,176,0,0.15);
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    z-index: 5;
+  }
+
+  #mobile-bar .btn-row {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    width: 100%;
+  }
+
+  #mobile-bar button {
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+    color: var(--amber);
+    background: rgba(255,176,0,0.08);
+    border: 1px solid var(--amber-dim);
+    border-radius: 6px;
+    padding: 8px 0;
+    flex: 1;
+    min-width: 0;
+    max-width: 72px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.1s;
+  }
+
+  #mobile-bar button:active {
+    background: rgba(255,176,0,0.25);
+    color: var(--amber-bright);
+  }
+
+  #mobile-bar button.dir {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--amber-bright);
+    max-width: 56px;
+  }
+
+  #mobile-bar button.wide {
+    max-width: 100px;
+  }
+
+  /* --- Mobile Inventory Toggle --- */
+  #inv-toggle {
+    display: none;
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 200;
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    color: var(--amber);
+    background: rgba(13,10,3,0.9);
+    border: 1px solid var(--amber-dim);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #inv-toggle:active {
+    background: rgba(255,176,0,0.2);
+  }
+
+  /* --- Responsive: Tablet --- */
+  @media (max-width: 860px) {
+    #monitor {
+      max-width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      border-radius: 0;
+      padding: 8px;
+    }
+
+    #screen { border-radius: 6px; }
+
+    #sidebar {
+      top: 50px;
+      right: 8px;
+      width: 200px;
+    }
+  }
+
+  /* --- Responsive: Mobile --- */
+  @media (max-width: 600px) {
+    #monitor {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      border-radius: 0;
+      padding: 0;
+    }
+
+    #screen { border-radius: 0; }
+
+    #output {
+      font-size: 15px;
+      padding: 10px 12px;
+      line-height: 1.4;
+    }
+
+    .line.title {
+      font-size: 11px;
+    }
+
+    #input-area {
+      padding: 6px 12px 8px;
+    }
+
+    #prompt { font-size: 15px; }
+
+    #cmd {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+
+    #mobile-bar { display: flex; }
+    #inv-toggle { display: block; }
+
+    #sidebar {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100%;
+      max-height: 100vh;
+      border-radius: 0;
+      border: none;
+      padding: 50px 20px 20px;
+      overflow-y: auto;
+      background: rgba(13,10,3,0.97);
+      z-index: 150;
+    }
+
+    #sidebar h3 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    #sidebar li {
+      font-size: 18px;
+      padding: 4px 0;
+    }
+
+    #sidebar .close-sidebar {
+      display: block;
+    }
+  }
+
+  /* --- Keyboard open: shrink layout --- */
+  @media (max-height: 450px) and (max-width: 600px) {
+    #output {
+      font-size: 14px;
+      padding: 6px 10px;
+      line-height: 1.3;
+    }
+
+    #mobile-bar { display: none; }
+
+    #input-area { padding: 4px 10px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="monitor">
+  <div id="screen">
+    <div id="intro-overlay" onclick="startGame()">
+      <canvas id="intro-canvas" width="640" height="480"></canvas>
+    </div>
+    <div id="output"></div>
+    <div id="input-area">
+      <span id="prompt">C:\&gt;</span>
+      <input type="text" id="cmd" placeholder="parancs..." autocomplete="off" autofocus>
+    </div>
+    <div id="mobile-bar">
+      <div class="btn-row">
+        <button class="dir" onclick="mobileCmd('é')">É</button>
+        <button class="dir" onclick="mobileCmd('d')">D</button>
+        <button class="dir" onclick="mobileCmd('ny')">Ny</button>
+        <button class="dir" onclick="mobileCmd('k')">K</button>
+      </div>
+      <div class="btn-row">
+        <button class="wide" onclick="mobileCmd('keresek')">Keres</button>
+        <button class="wide" onclick="mobileCmd('várok')">Vár</button>
+        <button class="wide" onclick="mobileCmd('néz')">Néz</button>
+        <button class="wide" onclick="mobileCmd('lista')">Tárgy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="inv-toggle" onclick="toggleMobileSidebar()">🎒</button>
+
+<div id="sidebar">
+  <h3>🎒 Tárgyak</h3>
+  <ul id="inv-list"></ul>
+</div>
+
+<script>
+// ============================================================
+// DESERT WIND - JavaScript konverzió (Act 1)
+// Eredeti: Turbo Pascal - FoD Softworks
+// ============================================================
+
+// --- INTRO RAJZOLÁS (hű az eredeti Pascal grafikához) ---
+const introCanvas = document.getElementById('intro-canvas');
+const ctx = introCanvas.getContext('2d');
+let porzasInterval = null;
+let blinkInterval = null;
+
+function drawIntro() {
+  const W = 640, H = 480;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Keret (Line 0,0 -> 640,0 stb.)
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  // "Desert Wind" cím - nagy betűk, ~(230, 60)
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 28px "Press Start 2P", monospace';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Desert Wind', 150, 50);
+
+  // Intro szöveg - kis betűk, ~(50, 110)
+  ctx.font = '14px "Press Start 2P", monospace';
+  ctx.fillText('A kiszámíthatatlan jövőbe utazol.', 30, 110);
+  ctx.fillText('Egy átlagember bőrébe bújva éld át', 30, 130);
+  ctx.fillText('a korszak minden szenvedését.', 30, 150);
+  ctx.fillText('Közben törekedj a túlélésre.', 30, 170);
+
+  // Kék ég - Bar(50,200,590,400)
+  ctx.fillStyle = '#0000AA';
+  ctx.fillRect(50, 200, 540, 200);
+
+  // Sárga homok - Bar(50,350,590,400)
+  ctx.fillStyle = '#CCAA00';
+  ctx.fillRect(50, 350, 540, 50);
+
+  // Homok gradiens hatás (finomabb átmenet)
+  const sandGrad = ctx.createLinearGradient(50, 340, 50, 400);
+  sandGrad.addColorStop(0, '#CCAA00');
+  sandGrad.addColorStop(1, '#AA8800');
+  ctx.fillStyle = sandGrad;
+  ctx.fillRect(50, 350, 540, 50);
+
+  // Nap - For i:=1 to 25 do Circle(520,240,i) -> kitöltött kör
+  ctx.fillStyle = '#FFD700';
+  ctx.beginPath();
+  ctx.arc(520, 250, 25, 0, Math.PI * 2);
+  ctx.fill();
+  // Nap ragyogás
+  ctx.strokeStyle = '#FFEE44';
+  ctx.lineWidth = 1;
+  for (let r = 26; r <= 32; r += 2) {
+    ctx.globalAlpha = 1 - (r - 25) / 10;
+    ctx.beginPath();
+    ctx.arc(520, 250, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Fű - fu(x,y): 3 vonal (x,y)->(x-5,y-5), (x,y)->(x,y-5), (x,y)->(x+5,y-5)
+  function drawGrass(x, y) {
+    ctx.strokeStyle = '#00AA00';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x - 5, y - 5);
+    ctx.moveTo(x, y); ctx.lineTo(x, y - 6);
+    ctx.moveTo(x, y); ctx.lineTo(x + 5, y - 5);
+    ctx.stroke();
+  }
+  // fu(60,360); fu(69,370); fu(82,365); fu(81,392);
+  drawGrass(60, 360);
+  drawGrass(69, 370);
+  drawGrass(82, 365);
+  drawGrass(81, 392);
+  // Még néhány extra fűcsomó a sivatagi hangulatért
+  drawGrass(150, 375);
+  drawGrass(210, 362);
+  drawGrass(310, 380);
+  drawGrass(420, 368);
+  drawGrass(500, 385);
+  drawGrass(550, 370);
+
+  // "Press any key to continue" - fehér, (230, 450)
+  ctx.fillStyle = '#fff';
+  ctx.font = '12px "Press Start 2P", monospace';
+  ctx.fillText('Kattints a folytatáshoz', 180, 450);
+
+  // Villogás
+  let blinkOn = true;
+  blinkInterval = setInterval(() => {
+    blinkOn = !blinkOn;
+    if (blinkOn) {
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px "Press Start 2P", monospace';
+      ctx.fillText('Kattints a folytatáshoz', 180, 450);
+    } else {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(178, 445, 300, 20);
+    }
+  }, 600);
+
+  // Porzás animáció - homokszemcsék (az eredeti: random sárga pixel a homokon, ami eltűnik)
+  startPorzas();
+}
+
+function startPorzas() {
+  const particles = [];
+  const maxParticles = 12;
+
+  porzasInterval = setInterval(() => {
+    // Töröljük az eltűnő szemcséket
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life--;
+      if (p.life <= 0) {
+        // Visszarajzoljuk az eredeti homok színt
+        ctx.fillStyle = '#CCAA00';
+        ctx.fillRect(p.x, p.y, 2, 2);
+        particles.splice(i, 1);
+      }
+    }
+
+    // Új szemcse
+    if (particles.length < maxParticles) {
+      const x = 55 + Math.random() * 530;
+      const y = 352 + Math.random() * 44;
+      const life = 3 + Math.floor(Math.random() * 8);
+      particles.push({ x, y, life });
+
+      // Világos sárga villanás
+      ctx.fillStyle = '#FFE866';
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }, 80);
+}
+
+// Font betöltés megvárása, aztán rajzolás
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => drawIntro());
+} else {
+  setTimeout(drawIntro, 500);
+}
+
+// Intro billentyűzettel is indítható (mint az eredeti ReadKey)
+document.addEventListener('keydown', function introKey(e) {
+  if (introOverlay.style.display !== 'none') {
+    startGame();
+    document.removeEventListener('keydown', introKey);
+  }
+});
+
+const output = document.getElementById('output');
+const cmdInput = document.getElementById('cmd');
+const introOverlay = document.getElementById('intro-overlay');
+const sidebar = document.getElementById('sidebar');
+const invList = document.getElementById('inv-list');
+const mobileBar = document.getElementById('mobile-bar');
+const invToggle = document.getElementById('inv-toggle');
+
+// --- Mobile funkciók ---
+function mobileCmd(cmd) {
+  if (cmdInput.disabled) return;
+  cmdInput.value = cmd;
+  cmdInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+}
+
+let sidebarOpen = false;
+function toggleMobileSidebar() {
+  sidebarOpen = !sidebarOpen;
+  sidebar.style.display = sidebarOpen ? 'block' : 'none';
+  if (sidebarOpen) {
+    // Add close button if not present
+    if (!sidebar.querySelector('.close-sidebar')) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'close-sidebar';
+      closeBtn.textContent = '✕ Bezár';
+      closeBtn.style.cssText = `
+        display:block; margin:0 auto 12px; font-family:'VT323',monospace;
+        font-size:18px; color:var(--amber); background:rgba(255,176,0,0.1);
+        border:1px solid var(--amber-dim); border-radius:6px; padding:8px 24px;
+        cursor:pointer;
+      `;
+      closeBtn.onclick = () => { sidebarOpen = false; sidebar.style.display = 'none'; };
+      sidebar.insertBefore(closeBtn, sidebar.firstChild);
+    }
+  }
+}
+
+// --- VisualViewport kezelés (virtuális billentyűzet) ---
+if (window.visualViewport) {
+  const monitor = document.getElementById('monitor');
+  window.visualViewport.addEventListener('resize', () => {
+    const vvh = window.visualViewport.height;
+    monitor.style.height = vvh + 'px';
+    // Scroll output to bottom when keyboard appears
+    setTimeout(() => { output.scrollTop = output.scrollHeight; }, 50);
+  });
+  window.visualViewport.addEventListener('scroll', () => {
+    // Keep the page from scrolling behind the keyboard
+    window.scrollTo(0, 0);
+  });
+}
+
+// --- Játékállapot ---
+const INITIAL_STATE = {
+  a: 2, otth: 0, list: 0, lista: [],
+  // Act 1
+  black: 0, targ: 0, konyh: 0, konyv: 0, sote: 0, ouu: 0,
+  necro: 0, abdul: 0, szant: 0,
+  oreg: false, ker: false, vara: true, lll: false,
+  ker5: false, ker7: false,
+  // parancs
+  parancs: '', para: '', targy: '', targyh: '',
+  space: true, use: false,
+  // Act 2
+  tere: 0,
+  radio1: false, puska: false, kar1: false,
+  nyilas: false, banya: false,
+  kotszer: false, gyogyszer: false,
+  cuccokgy: false, cuccokcs: false, cuccokinj: false,
+  ak: false, radio: false,
+  blackgun2: false, blackgun: false,
+  tars: false, radio2: false,
+  kaja: false, katonak: false, kapu: false,
+  // Act 3
+  necro2: 0, levett: false, radsuit: false,
+  saddam: false, hatalomkulcs: false,
+};
+
+function freshState() {
+  return Object.assign({}, INITIAL_STATE, { lista: [] });
+}
+
+let state = freshState();
+
+function addItem(name) {
+  state.list++;
+  state.lista.push(name);
+  updateInventory();
+}
+
+function removeItem(name) {
+  const idx = state.lista.indexOf(name);
+  if (idx !== -1) {
+    state.lista[idx] = '';
+  }
+  updateInventory();
+}
+
+function hasItem(name) {
+  return state.lista.includes(name);
+}
+
+function updateInventory() {
+  const items = state.lista.filter(x => x !== '');
+  const isMobile = window.innerWidth <= 600;
+  if (!invList) return;
+  invList.innerHTML = items.map(i => `<li>• ${i}</li>`).join('');
+  if (isMobile) {
+    // On mobile, sidebar visibility is controlled by toggle button only
+    invToggle.style.display = items.length > 0 ? 'block' : 'none';
+    // If sidebar is open, keep it open; don't auto-show
+  } else {
+    sidebar.style.display = items.length > 0 ? 'block' : 'none';
+  }
+}
+
+// --- Kiírás (DOM batch-eléssel) ---
+let _printBuffer = null;
+
+function _ensureBuffer() {
+  if (!_printBuffer) _printBuffer = document.createDocumentFragment();
+}
+
+function _flushBuffer() {
+  if (_printBuffer) {
+    output.appendChild(_printBuffer);
+    _printBuffer = null;
+    output.scrollTop = output.scrollHeight;
+  }
+}
+
+function print(text, cls = 'line') {
+  _ensureBuffer();
+  const div = document.createElement('div');
+  div.className = cls;
+  div.textContent = text;
+  _printBuffer.appendChild(div);
+}
+
+function println(text, cls) {
+  if (text === '' || text === undefined) {
+    _ensureBuffer();
+    const div = document.createElement('div');
+    div.className = 'line empty';
+    _printBuffer.appendChild(div);
+  } else {
+    print(text, cls ? `line ${cls}` : 'line');
+  }
+}
+
+function printDeath(text) { println(text, 'death'); }
+function printSuccess(text) { println(text, 'success'); }
+function printSystem(text) { println(text, 'system'); }
+
+// --- Játék indítása ---
+function startGame() {
+  introOverlay.style.display = 'none';
+  if (porzasInterval) clearInterval(porzasInterval);
+  if (blinkInterval) clearInterval(blinkInterval);
+  state.a = 2;
+  state.otth = 0;
+  // Reset mobile sidebar
+  sidebarOpen = false;
+  sidebar.style.display = 'none';
+  processRoom();
+  _flushBuffer();
+  cmdInput.focus();
+}
+
+// --- Parancsarchívum ---
+const cmdHistory = [];
+let cmdHistoryIdx = -1;
+
+// --- Parancs feldolgozás ---
+cmdInput.addEventListener('keydown', function(e) {
+  // Parancsarchívum: nyíl fel/le
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (cmdHistory.length > 0) {
+      if (cmdHistoryIdx < cmdHistory.length - 1) cmdHistoryIdx++;
+      cmdInput.value = cmdHistory[cmdHistoryIdx];
+    }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (cmdHistoryIdx > 0) {
+      cmdHistoryIdx--;
+      cmdInput.value = cmdHistory[cmdHistoryIdx];
+    } else {
+      cmdHistoryIdx = -1;
+      cmdInput.value = '';
+    }
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.stopPropagation();
+    if (cmdInput.disabled) return;
+    const raw = cmdInput.value.trim().toLowerCase();
+    cmdInput.value = '';
+    if (!raw) return;
+
+    // Archívumba mentés
+    cmdHistory.unshift(raw);
+    if (cmdHistory.length > 50) cmdHistory.pop();
+    cmdHistoryIdx = -1;
+
+    try {
+      dispatchCommand(raw);
+    } finally {
+      _flushBuffer();
+    }
+  }
+});
+
+function dispatchCommand(raw) {
+    println('');
+    print(`C:\\>${raw}`, 'line system');
+    println('');
+
+    state.parancs = raw;
+    state.para = raw.length > 3 ? raw.substring(0, 3) : raw;
+    state.use = false;
+
+    // Vizsgál parancs
+    if (state.para === 'viz') {
+      parseObject(raw);
+      handleVizsgal();
+      return;
+    }
+
+    // Használ parancs
+    if (state.para === 'has') {
+      parseObjectH(raw);
+      handleHasznal();
+      processRoom();
+      return;
+    }
+
+    // Globális parancsok
+    if (state.para === 'seg') { showHelp(); return; }
+    if (state.para === 'lis' || state.para === 'l') { showInventory(); return; }
+    if (state.para === 'vég' || state.para === 'bef') {
+      state.a = 1;
+      handleHalal();
+      return;
+    }
+    if (state.para === 'néz' || state.para === 'nez') {
+      state.otth = 0;
+      processRoom();
+      return;
+    }
+    if (state.para === 'cls') {
+      output.innerHTML = '';
+      return;
+    }
+
+    // Szoba-specifikus parancsok
+    processCommand();
+}
+
+function parseObject(raw) {
+  const parts = raw.split(' ');
+  if (parts.length > 1) {
+    state.targy = parts[1].substring(0, 3);
+  } else {
+    state.targy = '';
+  }
+}
+
+function parseObjectH(raw) {
+  const parts = raw.split(' ');
+  if (parts.length > 1) {
+    state.targyh = parts[1].substring(0, 3);
+  } else {
+    state.targyh = '';
+  }
+}
+
+// --- Halál ---
+function handleHalal() {
+  if (state.a === 1) {
+    state.a = 0;
+    println('');
+    printDeath('Kalandod itt véget ér.');
+    println('');
+    printSystem('[ Kattints ide vagy nyomj ENTER-t az újrakezdéshez ]');
+    _flushBuffer();
+    cmdInput.disabled = true;
+    document.addEventListener('keydown', restartHandler, { once: true });
+    output.addEventListener('click', restartClick, { once: true });
+  }
+}
+
+function restartHandler(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    restartGame();
+  }
+}
+function restartClick() { restartGame(); }
+
+function restartGame() {
+  // Takarítás: lehetséges maradék listenerek eltávolítása
+  document.removeEventListener('keydown', restartHandler);
+  output.removeEventListener('click', restartClick);
+  output.innerHTML = '';
+  state = freshState();
+  // Reset mobile sidebar
+  sidebarOpen = false;
+  sidebar.style.display = 'none';
+  updateInventory();
+  processRoom();
+  _flushBuffer();
+  cmdInput.disabled = false;
+  cmdInput.focus();
+}
+
+// --- Segítség ---
+function showHelp() {
+  println('A használható parancsok:');
+  println('É, D, Ny, K: Mozgás a négy fő égtáj felé');
+  println('Néz: A helyszín leírása');
+  println('Vége, Befejez: A játék feladása');
+  println('Várok: Egy kis idő eltöltése az adott helyszínen');
+  println('Keresek: A helyszín átkutatása');
+  println('Lista, L: A nálad lévő tárgyak kiíratása');
+  println('Segítség: Ez a szöveg');
+  println('Használ [tárgy]: Egy tárgy alkalmazása');
+  println('Vizsgál [tárgy]: Egy tárgy szemrevételezése');
+  println('Cls: Képernyőtörlés');
+  println('');
+  printSystem('(Elég ha minden parancsnak az első három betűjét írod ki)');
+  printSystem('Csak kisbetűket használj!');
+}
+
+function showInventory() {
+  const items = state.lista.filter(x => x !== '');
+  println('Ezek a tárgyak vannak nálad:');
+  if (items.length === 0) {
+    println('  (semmi)');
+  } else {
+    items.forEach(i => println(`  • ${i}`));
+  }
+}
+
+// --- Vizsgál ---
+function handleVizsgal() {
+  const t = state.targy;
+  if (t === 'gyű' && state.ouu === 1) {
+    println('Szép kis aranygyűrű. Rá van írva: For the glory of the FoD!');
+  } else if (t === 'kön' && state.necro === 1) {
+    println('Egy ismeretlen betűkkel írt könyv. Nem sok hasznát veszed.');
+  } else if (t === 'kul' && state.konyh === 1) {
+    println('Egy aranyos kis bankkártya-szerű izé.');
+  } else if (t === 'fir' && state.cuccokcs) {
+    println('Egy elsősegély csomag. Vannak benne kötszerek meg fertőtlenítő meg ilyesmi.');
+  } else if (t === 'inj' && state.cuccokinj) {
+    println('Egy szép kis injekciós tű. Erős vágyat érzel hogy magadba szúrd.');
+  } else if (t === 'gyó' && state.cuccokgy) {
+    println('Egy műanyag doboz tele kis piros kapszulákkal.');
+  } else if ((t === 'ak-' || t === 'ak4') && state.ak) {
+    println('Egy AK-47, háború előtti géppuska. Ezt a kiképzésen kaptad.');
+  } else if (t === 'rád' && state.radio) {
+    println('Egy rádió, amivel kommunikálhatsz a központtal.');
+  } else if (t === '???' && state.blackgun) {
+    println('Egy pisztolyforma tárgy. Mintha rá lenne valami írva, de nem látod tisztán.');
+  } else if (t === 'mr.' && state.blackgun2) {
+    println('Egy különös pisztoly, egy nagy piros gombbal. Hatalmas pusztításra (lenne) képes.');
+  } else if (t === 'hat' && state.hatalomkulcs) {
+    println('Az uralkodó hatalmának kulcsa. Lehetetlen leírni, hogy néz ki.');
+  } else if (t === 'véd' && state.radsuit) {
+    println('Egy hőálló védőruha, amit a bennszülöttektől kaptál.');
+  } else if (t === 'nec' && state.necro2 === 1) {
+    println('Abdul Alhazred félelmetes Necronomiconja. Lefordított változat, olvasható.');
+  } else {
+    // Szoba-specifikus vizsgálás
+    const room = rooms[state.a];
+    if (room && room.vizsgal) {
+      room.vizsgal(t);
+    } else {
+      println('Nem ismerem ezt a tárgyat.');
+    }
+  }
+}
+
+// --- Használ ---
+function handleHasznal() {
+  const th = state.targyh;
+  // Gyógyszer
+  if (th === 'gyó' && state.cuccokgy) {
+    println('A fájdalom enyhülni kezd. Megkönnyebbülten sóhajtasz fel. Beveszel egy másik');
+    println('tablettát, mire a gyomrod elkezd kavarogni. Hát, sajnos nem tudsz kirohanni a');
+    println('WC-re. Helyben beszarsz. Szerencse, hogy a társaid már meghaltak, mert ez a');
+    println('szag most úgyis kinyírná őket.');
+    state.gyogyszer = true;
+    removeItem('gyógyszer');
+    state.cuccokgy = false;
+    state.use = true;
+    return;
+  }
+  // Injekció
+  if (th === 'inj' && state.cuccokinj) {
+    println('Megfogod a tűt, és magadba szúrod. Csak ekkor veszed észre a koponyát rajta, ami');
+    println('most kivételesen nem azt jelzi, hogy a FoD tulajdona. Végülis mindegy.');
+    state.a = 1;
+    state.use = true;
+    return;
+  }
+  // First aid kit
+  if (th === 'fir' && state.cuccokcs) {
+    println('Bekötözöd sebeidet. A vérzés eláll.');
+    state.kotszer = true;
+    removeItem('first aid kit');
+    state.cuccokcs = false;
+    state.use = true;
+    return;
+  }
+  // Rádió
+  if (th === 'rád' && state.radio1) {
+    state.radio2 = true;
+    state.radio1 = false;
+    state.use = true;
+    println('A rádiót használva értesíted a központot a helyzetedről. Holnapra oda tudnak');
+    println('érni egy felmentőcsapattal. A társad pedig megosztja velük különleges tudását.');
+    println('Egyelőre kétkedve fogadják a hírt, és felderítőket küldenek azokra a területekre.');
+    println('Nektek ki kell valahogyan húznotok másnap reggelig. Nehéz lesz, főleg ha a birodalmiak');
+    println('fogták az előbbi beszélgetést.');
+    return;
+  }
+  // AK-47 (vault-ban van kezelve szoba szinten)
+  // Kapu bezárása (vault3-ban van kezelve szoba szinten)
+  // Védőruha
+  if (th === 'véd') {
+    if (state.radsuit) {
+      println('Leveted a védőruhát. Már kezdtél megfulladni benne.');
+      state.levett = true;
+      state.use = true;
+      return;
+    }
+  }
+  // Szoba-specifikus használ
+  const room = rooms[state.a];
+  if (room && room.hasznal) {
+    room.hasznal(th);
+  }
+  if (!state.use) {
+    println('Ezt a tárgyat itt nem tudod használni.');
+  }
+}
+
+// --- Ellenőrzés ---
+function checkUnknownCommand() {
+  const p = state.para;
+  const known = ['néz','nez','has','é','k','ny','d','ker','seg','l','lis','vár','var',
+                 'vég','bef','ige','nem','viz','cls'];
+  if (!known.includes(p)) {
+    println('Ezt a parancsot nem ismerem. Próbáltad már a segítség-et?');
+  }
+  if (!state.ker && p === 'ker') println('Nem találsz semmit.');
+  if (!state.vara && (p === 'vár' || p === 'var')) println('Nem történik semmi.');
+}
+
+// --- Szobák ---
+function processRoom() {
+  if (state.a === 0) {
+    // Game over (victory) - offer restart
+    println('');
+    printSystem('[ Kattints ide vagy nyomj ENTER-t az újrakezdéshez ]');
+    _flushBuffer();
+    cmdInput.disabled = true;
+    document.addEventListener('keydown', restartHandler, { once: true });
+    output.addEventListener('click', restartClick, { once: true });
+    return;
+  }
+  if (state.a === 1) { handleHalal(); return; }
+  const room = rooms[state.a];
+  if (room && room.describe) {
+    const prevA = state.a;
+    room.describe();
+    // describe() közben bekövetkezhet halál, győzelem, vagy szobaváltás
+    if (state.a !== prevA) {
+      processRoom();
+      return;
+    }
+  }
+}
+
+function processCommand() {
+  const room = rooms[state.a];
+  if (room && room.command) {
+    state.ker = false;
+    state.vara = false;
+    room.command();
+    checkUnknownCommand();
+    if (state.a === 1) handleHalal();
+    else processRoom();
+  }
+}
+
+// ============================================================
+// SZOBÁK DEFINÍCIÓJA - ACT 1
+// ============================================================
+const rooms = {};
+
+// --- a=2: Otthon ---
+rooms[2] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Álmosan kelsz fel. A Nap még fel se jött az égre, de neked');
+      println('már dolgoznod kell. Zörgetnek az ajtódon. Sietned kell, vagy újra');
+      println('fogolytáborba jutsz. És azt biztosan nem éled túl. 30 évet robotoltál');
+      println('már az uralkodó szolgálatában, de érzed, erőd elhagyott. Ez pedig azt');
+      println('jelenti, nemsokára megválnak tőled.');
+      println('De most nincs időd erre. Menned kell a munkára.');
+      println('Az ajtó észak felé van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.ker = false;
+    state.vara = true;
+    if (p === 'k' || p === 'ny' || p === 'd') println('Minduntalan falba ütközöl.');
+    if (p === 'é') { state.a = 3; state.otth = 0; }
+    if (p === 'vár' || p === 'var') {
+      println('Hát ezt nem kellett volna. A katonák betörik az ajtódat, hogy megnézzék, miért');
+      println('nem jössz már. Mikor meglátnak ott lustálkodni, talpra állítanak és');
+      println('kivonszolnak. A helyszínen agyonlőnek.');
+      state.a = 1;
+    }
+  }
+};
+
+// --- a=3: Falu1 ---
+rooms[3] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A szerény kis kunyhód előtt állsz. Kétoldalt közrefog két');
+      println('gépfegyveres katona, és finoman megkérnek, hogy húzd a beled');
+      println('a földekre. Jobb lesz ha engedelmeskedsz nekik.');
+      println('A szántóföld északra van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = true;
+    if (p === 'd' || p === 'k' || p === 'ny')
+      println('Jobb lesz ha nem erre mész. A katonák ezt nem szívlelnék.');
+    if (p === 'é') { state.a = 4; state.otth = 0; }
+    if (p === 'ker') println('Most akarsz nekiállni keresni? Nem ajánlom.');
+    if (p === 'vár' || p === 'var') { println('A katonák továbbbtuszkolnak.'); state.a = 4; state.otth = 0; }
+  }
+};
+
+// --- a=4: Szántó ---
+rooms[4] = {
+  describe() {
+    if (state.szant === 0) {
+      println('A Nap most már kezd feljönni a láthatáron. Talán a napsugarak');
+      println('elűzik ezt a fogcsikorgató hideget. Megkezded mindennapi');
+      println('munkádat. Pár óra múlva furcsa zajra leszel figyelmes. Hiába');
+      println('kapod fel a fejed, nem látsz semmit. A zaj erősödni kezd. Most');
+      println('már felismered, ez egy motor hangja. Azaz kb. 200-é. Végre meg is');
+      println('látod a motorosokat. Az út felől jönnek, át a szántón. A katonák');
+      println('fegyvereikhez kapnak, de nemsokára mind holtan fekszenek. A');
+      println('motorosoknak furcsa fegyvereik vannak, és nagyon hatékonynak tűnnek.');
+      println('A munkások szétrohannak minden égtáj felé. Egyedül te maradsz a helyeden');
+      println('mozdulatlanul. A gépek leállnak, és egy magas, izmos alak (láthatóan a vezér)');
+      println('lép elébed.');
+      println('-Ki vagy te?');
+      println('Ezt a kérdést még sohasem tették fel neked. Tanácstalanul állsz.');
+      println('-Mi van? Nincs neved?');
+      println('-Név? -nézel furcsán a motorosra.');
+      println('-Szóval nincs neved. Sorszámod?');
+      println('Most valami derengeni kezd. A katonák mindig C-117-esnek szólítottak. Elmondod');
+      println('ezt hát a vezérnek. Ő érdekesen néz rád, majd megszólal:');
+      println('- Eredj a dolgodra.');
+      println('Ezzel felpattannak motorjaikra és elhajtanak dél felé.');
+      state.szant = 1;
+    }
+    if (state.otth === 0) {
+      println('A mezőn állsz. Körülötted halott katonák fekszenek.');
+      println('Az út dél felé van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = true;
+    if (p === 'é' || p === 'ny' || p === 'k')
+      println('Végtelen szántóföld amerre csak látsz. Nem lenne jó erre menni.');
+    if (p === 'd') { state.a = 5; state.otth = 0; }
+    if (p === 'ker')
+      println('A halott katonáknál volt egy csomó fegyver, de te egyiket sem tudod használni.');
+    if (p === 'vár' || p === 'var') {
+      println('');
+      println('Na ezt nem kellett volna. A hullák elkezdenek rothadni. A bűz olyan');
+      printDeath('elviselhetetlen, hogy öngyilkos leszel.');
+      state.a = 1;
+    }
+  }
+};
+
+// --- a=5: Országút ---
+rooms[5] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Az országút közepén állsz. Észak felé vannak a szántóföldek, délre a falu.');
+      println('Nyugatra és keletre folytatódik a végtelen aszfalt.');
+      if (state.ouu === 0) println('Valami fénylő tárgyat látsz tőled 10 méterre.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    if (!state.ker5) state.ker = true;
+    state.ker5 = true;
+    if (p === 'é') { state.a = 4; state.otth = 0; }
+    if (p === 'd') { state.a = 6; state.otth = 0; }
+    if (p === 'ny') println('Pár óra gyaloglás után inkább visszafordulsz.');
+    if (p === 'k') { state.a = 8; state.otth = 0; }
+    if (p === 'ker') {
+      if (state.ouu === 0) {
+        println('Egy gyűrűt találtál. Jobban megnézve észreveszed, hogy rá van vésve:');
+        printSuccess('For the glory of the FoD!!');
+        println('Fogalmad sincs hogy ez mit jelenthet, de azért elteszed.');
+        state.ouu = 1;
+        addItem('gyűrű');
+      }
+    }
+  }
+};
+
+// --- a=6: Falu2 ---
+rooms[6] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Megint itt állsz, pedig nincs is még éjjel. Furcsa érzés nappal is látni ezt');
+      println('a helyet. Az emberek bezárkóztak házaikba. Nem értik, mi történt. Mondjuk te se.');
+      println('Déli irányban meglátod a házadat.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.ker = false;
+    state.vara = false;
+    if (p === 'é') { state.a = 5; state.otth = 0; }
+    if (p === 'd') { state.a = 7; state.otth = 0; }
+    if (p === 'k' || p === 'ny') println('Utadat állják a házak.');
+  }
+};
+
+// --- a=7: Házi ---
+rooms[7] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Itt lakom látod, ez az a ház... Csak az ágyad és a kis szekrényed van itt.');
+      println('Az ajtó északra van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    if (!state.ker7) state.ker = true;
+    state.ker7 = true;
+    if (p === 'ker') {
+      if (state.necro === 0) {
+        println('A szekrényben megtalálod azt az ősi könyvet, mely generációk óta a családodnál');
+        println('van. Ez az egyetlen személyes tárgyad, amit a katonák nem vettek el tőled.');
+        println('(Mire is tudnának használni egy könyvet? Talán gyújtósnak.) Olvasni nem tudod,');
+        println('mivel számodra ismeretlen írásjelek vannak benne. Azért elteszed, hátha jó lesz');
+        println('még valamire.');
+        addItem('könyv');
+        state.abdul = state.lista.length - 1;
+        state.necro = 1;
+      } else {
+        state.ker = false;
+      }
+    }
+    if (p === 'é') { state.otth = 0; state.a = 6; }
+    if (p === 'd' || p === 'ny' || p === 'k') println('Minduntalan falba ütközöl.');
+  }
+};
+
+// --- a=8: Este ---
+rooms[8] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Több órát gyalogolsz. Már beesteledett, és nagyon kezdesz fáradni. Egyszer csak');
+      println('dél felé meglátsz egy tábortüzet.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (p === 'é' || p === 'k') println('Túl sötét van erre. Nem látsz semmit.');
+    if (p === 'ny') { state.otth = 0; state.a = 5; }
+    if (p === 'd') { state.otth = 0; state.a = 9; }
+  }
+};
+
+// --- a=9: Tábor ---
+rooms[9] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Amint közelebb mész a fényhez, rengeteg sátrat látsz. Mellettük az ismerős');
+      println('motorok parkolnak. Gyanútlanul közelebb mész. Egyszer csak a bozótból eléd ugrik');
+      println('egy ember és rád szegezi géppuskáját. Kiált a többieknek, mire jön öt másik őr');
+      println('és elvezetnek a legnagyobb sátorhoz. A sátorban egy nagy asztalt látsz,');
+      println('körülötte 5-6 ember áll és valamin vitatkoznak. Az asztalon különböző bábukat');
+      println('látsz. Az egyik őröd mond valamit nekik, mire mindenki feléd fordul. Egy vékony,');
+      println('talpig fekete ruhában lévő ember eléd lép és megkérdi:');
+      println('- Hogy kerülsz ide, dolgozó?');
+      println('Elmeséled neki, mi történt a mai napon. Erre a feketeruhás így szól:');
+      println('- Elvették a megélhetésedet. Az uralkodó emberei nem látnak el többé élelemmel.');
+      println('Ezt megértjük. Felkínáljuk neked a lehetőséget, hogy beállj közénk. Így van');
+      println('esélyed a túlélésre. Döntséd: velünk tartasz vagy nem?');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    if (p !== 'nem' && p !== 'ige') println('Döntsél: igen vagy nem?');
+    if (p === 'nem') {
+      println('Úgy döntesz, nem fogadod el ajánlatukat. Elengednek, de figyelmeztetnek, hogy');
+      println('többé ne gyere a tábor közelébe. Néhány napig vándorolsz, majd egy újabb');
+      println('faluba érkezel. Itt a katonák észrevesznek, és beállítanak dolgozni. Életed');
+      printDeath('hátralévő részében híven szolgálod az uralkodót.');
+      state.a = 1;
+    }
+    if (p === 'ige') {
+      println('Az estét egy kicsi sátorban töltöd. Másnap reggel a sátrakat lebontják,');
+      println('elpakolnak mindent és továbbhajtanak dél felé. Téged egy tíz fős csapat kelet');
+      println('felé visz. Több napig utaztok, majd egy kis házhoz értek. Bementek a házba.');
+      println('Az egyik kísérőd elmozítja a padlószőnyeget, és így egy csapóajtó válik');
+      println('láthatóvá. Kinyitják az ajtót, és egy hosszú lépcsőn a mélybe ereszkedtek.');
+      println('Egy ember fent marad, hogy elrejtse a motorokat és őrködjön amíg visszatérnek');
+      println('a többiek. Ami lent fogad, minden képzeletedet felülmúlja. Egy óriási bázisban');
+      println('vagytok a föld alatt. Egy acélajtó előtt álltok. Kétoldalról egy-egy biztonsági');
+      println('kamera pásztáz felettetek. Társaid félmeztelenre vetkőznek, így láthatóvá válik');
+      println('a hátukra tetovált fekete koponya. A kamerák megállnak egy pillanatra, majd az');
+      println('ajtó kinyílik. Itt egy szűkös terem fogad titeket, benne egy furcsa készülékkel');
+      println('és egy 10 méteres kapuval. Az egyik társad ráteszi a készülékre a tenyerét,');
+      println('erre a kapu nagy robajjal kinyílik. Két őr jön ki, és láthatólag felismerik');
+      println('kísérőidet. Felőled kérdezősködnek, majd miután a többiek elmondják hogy mit');
+      println('keresel itt, beengednek titeket. Elvezetnek egy irodába. Itt készül rólad egy');
+      println('papír, majd kapsz egyenruhát. Végül megmutatják a kabinodat, és eddigi');
+      println('kísérőid elmennek hogy utolérjék a századukat.');
+      state.a = 10;
+      state.otth = 0;
+    }
+  }
+};
+
+// --- a=10: Kabin ---
+rooms[10] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A kabinodban vagy. Látsz egy kényelmes ágyat és egy tágas szekrényt.');
+      println('A kijárat kelet felé van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = true;
+    if (p === 'ker') println('Átkutatod a szekrényt, de nem találsz semmit.');
+    if (p === 'vár' || p === 'var') {
+      println('Lefekszel aludni. 2 óra múlva ébresztenek.');
+      state.a = 11;
+      state.otth = 0;
+    }
+    if (p === 'é' || p === 'd' || p === 'ny') println('Bumm! Csattan a fejed a falon.');
+    if (p === 'k') { state.otth = 0; state.a = 12; }
+  }
+};
+
+// --- a=11: Kiképzés (Act 2 cutscene) ---
+rooms[11] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A kiképzés nem is olyan kemény mint gondoltad. A robotolás sokkal nehezebb volt.');
+      println('Ezt legalább nem egyfolytában és nem étlen-szomjan kell végezned. Bár messze nem');
+      println('könnyű. Hát igen, a FoD-ba nem vesznek fel pancserokat.');
+      println('');
+      printSystem('[ ... idő telik ... ]');
+      println('');
+      println('Évek telnek el. Miután eléggé felkészültnek tartanak, letetetik veled az esküt.');
+      println('Kapsz tetoválást a hátadra. Ezzel teljes érvényű tagnak számítasz. Kapsz egy');
+      println('gyűrűt is, amilyet az úton találtál évekkel ezelőtt. Majd küldetést kapsz: a 25.');
+      println('hadosztályhoz kerülsz. Megkapod a koordinátákat, és szakaszoddal elindulsz.');
+      println('A hadosztályod táborhelye még 3 napi járóföldre van. Este van, letáboroztok.');
+      println('Tüzet gyújtotok, elfogyasztjátok szerény vacsorátokat és nyugovóra tértek.');
+      println('Az éjszaka közepén szörnyű robajra ébredsz. Az egyik társadat látod, amint');
+      println('géppuskával a kezében lesorozza a többieket. Gyorsan felpattansz, de téged is');
+      printDeath('elérnek a golyók. Minden sötétségbe borul...');
+      println('');
+      printSystem('[ ... idő telik ... ]');
+      println('');
+      println('Amikor magadhoz térsz, a szétzúzott tábort látod. A bal kezeden egy lőtt seb van.');
+      println('Körülötted a bajtársaid holttestei hevernek. Az árulót sehol sem látod. Vajon');
+      println('miért fordult ellenetek? Nem tudsz sokat gondolkozni, mert a fájdalom visszazök-');
+      println('kent a valóságba. Gyorsan keresned kell valamit a sebre, vagy elvérzel!');
+      state.otth = 1;
+      state.a = 30;
+      state.otth = 0;
+      addItem('AK-47');
+      addItem('Rádió');
+      state.ak = true;
+      state.radio = true;
+    }
+  },
+  command() {}
+};
+
+// ============================================================
+// ACT 2 SZOBÁK
+// ============================================================
+
+// --- a=30: Tábor közepe ---
+rooms[30] = {
+  describe() {
+    if (state.otth === 0) {
+      state.otth = 1;
+      println('A tábor közepén vagy. Északra van az orvosi sátor (!!!). Keletre a tábortűz');
+      println('romjait látod.');
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'ker') println('Nem találsz semmit. Talán az orvosi sátorban kellene nézned?');
+    if (p === 'vár' || p === 'var') { printDeath('Elvéreztél.'); state.a = 1; }
+    if (p === 'ny') { state.otth = 0; state.a = 31; }
+    if (p === 'd') { state.otth = 0; state.a = 32; }
+    if (p === 'é') { state.otth = 0; state.a = 33; }
+    if (p === 'k') { state.otth = 0; state.a = 34; }
+  }
+};
+
+// --- a=31: Tábor3 (irányjelző) ---
+rooms[31] = {
+  describe() {
+    if (state.otth === 0) {
+      state.otth = 1;
+      println('Egy óriási méretű irányjelző táblát látsz, amely az orvosi sátor felé mutat.');
+      println('Vajon merre??');
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'ker') println('Nem találsz semmit. Talán az orvosi sátorban kellene nézned?');
+    if (p === 'vár' || p === 'var') { printDeath('Elvérzél.'); state.a = 1; }
+    if (p === 'é') { state.otth = 0; state.a = 32; }
+    if (p === 'd' || p === 'ny') {
+      printDeath('Mész, mész, a véred egyre fogy. Egyszer csak elkezdesz szédülni és már nem tudsz továbbmenni.');
+      state.a = 1;
+    }
+    if (p === 'k') { state.otth = 0; state.a = 30; }
+  }
+};
+
+// --- a=32: Tábor4 (másik irányjelző) ---
+rooms[32] = {
+  describe() {
+    if (state.otth === 0) {
+      state.otth = 1;
+      println('Egy óriási irányjelző táblát látsz, amely az orvosi sátor felé mutat.');
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'ker') println('Nem találsz semmit. Talán az orvosi sátorban kellene nézned?');
+    if (p === 'vár' || p === 'var') { printDeath('Elvéreztél.'); state.a = 1; }
+    if (p === 'é') { state.otth = 0; state.a = 30; }
+    if (p === 'd') { state.otth = 0; state.a = 34; }
+    if (p === 'k') { printDeath('Mész, mész, a véred egyre fogy. A többit szerintem sejted.'); state.a = 1; }
+    if (p === 'ny') { state.otth = 0; state.a = 31; }
+  }
+};
+
+// --- a=33: Orvosi sátor ---
+rooms[33] = {
+  describe() {
+    if (state.otth === 0) {
+      state.otth = 1;
+      println('A szakaszod néhai orvosának sátrában vagy. Mindenhol ampullákat, gyógyszereket');
+      println('és elsősegélycsomagokat látsz.');
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') { printDeath('Elvéreztél.'); state.a = 1; }
+    if (p === 'ker') {
+      if (!state.cuccokcs) {
+        state.cuccokgy = true;
+        state.cuccokcs = true;
+        state.cuccokinj = true;
+        println('Elteszel egy elsősegélycsomagot, egy injekciós tűt és két doboz gyógyszert.');
+        addItem('gyógyszer');
+        addItem('first aid kit');
+        addItem('injekció');
+      }
+    }
+    if (p === 'é' || p === 'ny' || p === 'k') println('Ne tedd tönkre a sátort! Menj a nyíláson ki!');
+    if (p === 'd') {
+      if (state.kotszer && state.gyogyszer) {
+        println('A tábortűz felé veszed az irányt.');
+        state.otth = 0;
+        state.a = 34;
+      } else {
+        printDeath('A sérülésedbe belehalsz.');
+        state.a = 1;
+      }
+    }
+  }
+};
+
+// --- a=34: Tábortűz ---
+rooms[34] = {
+  describe() {
+    if (!state.kotszer || !state.gyogyszer) {
+      printDeath('A sérülésedbe belehalsz.');
+      state.a = 1;
+      return;
+    }
+    if (state.otth === 0) {
+      println('A tűz romjainál vagy. A társaid a szokottnál is erősebben bűzlenek.');
+      println('Talán mert halottak? Ki tudja. Jobb lesz innen elhúzni.');
+      println('Kelet felé sűrű erdőt látsz.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('A hullák már nagyon büdösek. Húzz el gyorsan!');
+    if (p === 'ker') println('Átkutatod a holttesteket? Fúújjj! Hullagyalázó!');
+    if (p === 'd') println('Nincs erre semmi.');
+    if (p === 'é' || p === 'ny') println('Nem kéne visszamenned. Rossz emlékek jönnek a felszínre (valami mással együtt).');
+    if (p === 'k') { state.a = 35; state.otth = 0; }
+  }
+};
+
+// --- a=35: Erdő ---
+rooms[35] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy nagy és sötét erdőbe értél. Keletre látsz egy ordast, amint éppen Piroskával');
+      println('PARENTAL ADVISORY!!! PARENTAL ADVISORY!!! PARENTAL ADVISORY!!!');
+      println('Délre egy mézeskalács házikó. Az ablakon keresztül látod, hogy egy Jancsi nevű');
+      println('gyerek (nem tudod honnan, csak tudod a nevét és kész.) odamegy a ház tulajdonosához');
+      println('PARENTAL ADVISORY!!! PARENTAL ADVISORY!!! PARENTAL ADVISORY!!!');
+      println('a sliccét, és mosolygós pofával elsomfordál. Juliska közben PARENTAL ADVISORY!!!');
+      println('A sáros földön megpillantasz néhány emberi lábnyomot. Észak felé vezetnek.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') {
+      println('Találsz néhány áfonyabokrot, és elkezdesz szedni. Közben előmászik néhány kicsi');
+      println('kék fickó, és elkezdenek parázni, hogy ez az övéké. Te nem zavartatod magad,');
+      println('egy perc múlva az összes kis ganajtúró a cipőd talpán van kilapítva.');
+    }
+    if (p === 'é') {
+      println('Órákon keresztül követed a lábnyomokat, míg egyszer csak eltűnnek.');
+      state.a = 38; state.otth = 0;
+    }
+    if (p === 'd') {
+      if (!state.banya) { state.a = 37; state.otth = 0; }
+      else println('Csak füstölgő romok vannak erre.');
+    }
+    if (p === 'k') { state.a = 36; state.otth = 0; }
+    if (p === 'ny') { state.a = 34; state.otth = 0; }
+  }
+};
+
+// --- a=36: Piroska ---
+rooms[36] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Mikor odalépsz, Piroskáék abbahagyják amit eddig csináltak. A farkas odajön');
+      println('hozzád:');
+      println('-Te nem is vagy ebben a történetben!');
+      println('A farkasnak igaza lehet.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = false;
+    if (p === 'vár' || p === 'var') println('A két jómadár egyre idegesebb. Láthatóan arra várnak hogy távozz.');
+    if (p === 'ny') { state.a = 35; state.otth = 0; }
+    if (p === 'é' || p === 'd' || p === 'k') println('Túl sűrű erre az erdő. Még eltévednél.');
+  }
+};
+
+// --- a=37: Mézeskalács ház ---
+rooms[37] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A kannibál mézeskalácsos néni lakhelyénél vagy. Roppant visszataszító');
+      println('hely. A vén banya érdekes tekintettel szemlél téged.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('A banya megfojtja a két üzekedő kölköt. Úgy kell nekik.');
+    if (p === 'ker') {
+      println('Találsz egy gyufásdobozt a padlón. Biztos az egyik áldozaté volt. Amikor senki');
+      println('sem néz oda, felgyújtod ezt a fertőt. A világ még egy gonosztól szabadult meg.');
+      println('Rajtad kívül senki sem tud kimenekülni, erről te is gondoskodsz.');
+      state.a = 35; state.otth = 0; state.banya = true;
+    }
+    if (p === 'é') { state.a = 35; state.otth = 0; }
+    if (p === 'ny' || p === 'd' || p === 'k') println('Túl sűrű erre az erdő. Még eltévednél.');
+  }
+};
+
+// --- a=38: Tisztás ---
+rooms[38] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy tisztáson vagy. A lábnyomok itt véget érnek, helyette keréknyomokat látsz.');
+      println('Ugyanúgy északra vezetnek.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') {
+      println('Megvizsgálod a nyomokat. Megállapítod, hogy egy motor nyomai, és láthatólag');
+      println('a fák közül került elő. De sajnos másik nem volt.');
+    }
+    if (p === 'd') { state.a = 35; state.otth = 0; }
+    if (p === 'é') {
+      println('Órák múlva egy nagy sziklát pillantasz meg.');
+      state.a = 39; state.otth = 0;
+    }
+    if (p === 'k' || p === 'ny') println('Csak a sűrű erdő.');
+  }
+};
+
+// --- a=39: Szikla (kétállapotú) ---
+rooms[39] = {
+  describe() {
+    if (!state.nyilas) {
+      if (state.otth === 0) {
+        println('Egy óriási szikla előtt állsz. A keréknyomok látszólag véget érnek, pontosan');
+        println('a szikla előtt. Keletre egy magasles van.');
+        state.otth = 1;
+      }
+    } else {
+      if (state.otth === 0) {
+        println('Egy barlang bejárata előtt vagy. A keréknyomok befelé vezetnek.');
+        state.otth = 1;
+      }
+    }
+  },
+  command() {
+    const p = state.para;
+    if (!state.nyilas) {
+      state.vara = false; state.ker = true;
+      if (p === 'ker') println('Megvizsgálod a sziklát. Jó kemény.');
+      if (p === 'é') println('Utadat állja a szikla.');
+      if (p === 'ny') println('Egy magas sziklafal van erre. Nem tudsz rajta felmászni.');
+      if (p === 'k') { state.a = 40; state.otth = 0; }
+      if (p === 'd') { state.a = 38; state.otth = 0; }
+    } else {
+      state.vara = false; state.ker = false;
+      if (p === 'é') { state.a = 41; state.otth = 0; }
+      if (p === 'ny') println('Egy magas sziklafal állja utadat.');
+      if (p === 'k') println('A magasles, így másodjára nézve erősen ingatag. Bármikor eldőlhet.');
+      if (p === 'd') { state.a = 38; state.otth = 0; }
+    }
+  }
+};
+
+// --- a=40: Magasles ---
+rooms[40] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Felmászol a magaslesre. Egy gép van fent, ami halkan búg. Különböző lámpák');
+      println('vannak rajta. Mellette egy kar és egy gomb.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'has') {
+      parseObjectH(state.parancs);
+      const th = state.targyh;
+      if (th === 'kar') {
+        println('A búgás abbamarad. A lámpák továbbra is világítanak.');
+        state.kar1 = true;
+        state.use = true;
+      }
+      if (th === 'gom') {
+        if (state.kar1) {
+          println('A szikla nagy robajjal szétnyílik.');
+          state.nyilas = true;
+          state.use = true;
+        } else {
+          printDeath('Megcsap a 220.');
+          state.a = 1;
+        }
+      }
+    }
+    if (p === 'é' || p === 'd' || p === 'k') println('Ki akarsz ugrani? Hülye vagy????!!!');
+    if (p === 'ny') { println('Lemászol.'); state.a = 39; state.otth = 0; }
+  },
+  hasznal(th) {
+    if (th === 'kar') {
+      println('A búgás abbamarad. A lámpák továbbra is világítanak.');
+      state.kar1 = true;
+      state.use = true;
+    }
+    if (th === 'gom') {
+      if (state.kar1) {
+        println('A szikla nagy robajjal szétnyílik.');
+        state.nyilas = true;
+        state.use = true;
+      } else {
+        printDeath('Megcsap a 220.');
+        state.a = 1;
+      }
+    }
+  }
+};
+
+// --- a=41: Barlang ---
+rooms[41] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy barlangban vagy. A beszűrődő napfényben látod, hogy egy nagy kapu előtt');
+      println('állsz. Egy retinaellenőrzőt is látsz. Belenézel. Letapogatja a szemedet, majd');
+      println('egy felirat jelenik meg rajta: Access Denied. Idegesedben szétvered a gépet.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'ny' || p === 'k') println('Utadat állja a barlang fala.');
+    if (p === 'é') {
+      if (!state.puska) {
+        println('Hoppá! A kapu, amint elé lépsz, kinyílik! Valamelyik hülye nem védte le!');
+        state.a = 42; state.otth = 0;
+      } else {
+        state.a = 43; state.otth = 0;
+      }
+    }
+    if (p === 'd') { state.a = 39; state.otth = 0; }
+  }
+};
+
+// --- a=42: Vault (őrök) ---
+rooms[42] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A Vault belsejében vagy. Két fegyveres őr odajön hozzád, és kéri tőled a');
+      println('jelszót. Gyorsan kéne cselekedned valamit.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = false;
+    if (p === 'vár' || p === 'var') {
+      printDeath('Látva tanácstalanságodat, az őrök rád szegezik fegyvereiket. Nemsokára már');
+      printDeath('csak egy húscafat marad belőled.');
+      state.a = 1;
+    }
+    if (p === 'é' || p === 'k' || p === 'ny' || p === 'd') {
+      printDeath('Az őrök, amint megmozdulsz, cafatokra lőnek.');
+      state.a = 1;
+    }
+  },
+  hasznal(th) {
+    if (th === 'ak-' || th === 'ak4') {
+      println('Előkapod a Kalasnyikovodat, és szitává lövöd őket. Hiába, jót tett az a');
+      println('kiképzés a FoD-központban a reflexeidnek.');
+      state.use = true;
+      state.puska = true;
+      state.a = 43;
+      state.otth = 0;
+    }
+  }
+};
+
+// --- a=43: Vault2 bejárat ---
+rooms[43] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A Vault bejáratánál vagy. Északra egy ajtó.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'é') { state.a = 44; state.otth = 0; }
+    if (p === 'k' || p === 'ny') println('Csak fal van erre.');
+    if (p === 'd') { state.a = 41; state.otth = 0; }
+  }
+};
+
+// --- a=44: Terem (áruló) ---
+rooms[44] = {
+  describe() {
+    state.radio1 = true;
+    if (state.tere === 0) {
+      println('Belépsz az ajtón, és szembe találod magad az árulóval.');
+      println('- Végre eljött a bosszúm órája. Halálra ítéllek a FoD elárulásáért.');
+      println('- Várj! Hallgass meg, könyörgöm!');
+      println('- Miért várjak, te féreg! Mit tudnál mondani, hogy megkíméljelek?!');
+      println('- Nem vagyok felelős a társaink haláláért! Az én kezem által estek el, de');
+      println('nem én irányítottam a testemet! Csak ezen a helyen tértem magamhoz.');
+      println('- És hogy csinálták volna ezt?');
+      println('- Egy chippel. Benne volt a fejemben. A fülemen keresztül távolították el, vagyis');
+      println('magától távozott. A táborban találhatott rám, és belém mászott miközben aludtam.');
+      println('Egészen úgy néz ki, mint valami bogár. De ez még nem minden. Bele voltak');
+      println('a zsarnok összes bázisának helye. Ezért jutottam el ide. És még mindig emlékszem');
+      println('a koordinátákra!');
+      println('Ezzel az Ellenállás óriási előnyre tehetne szert! És közelebb kerülne a');
+      println('Végső Győzelemhez. De az információt el kell juttatni a FoD-hoz.');
+      println('');
+      state.tere = 1;
+    }
+    if (state.tere === 1 && state.otth === 0) {
+      println('A kis teremben vagy. A társad egy széken ül.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = false;
+    if (p === 'vár' || p === 'var') {
+      if (state.katonak) {
+        println('Leszáll az éj. Persze ti ebből nem sokat vesztek észre. Nem igazán tudtok');
+        println('aludni. Másnap viszont jön a felmentősereg. Könnyen elűzik az ellenséget és');
+        printSuccess('kiszabadítanak titeket.');
+        state.a = 46;
+        state.otth = 0;
+      } else {
+        state.vara = false;
+      }
+    }
+    if (p === 'é' || p === 'k' || p === 'ny') println('Ne menj neki a falnak.');
+    if (p === 'd') { state.a = 45; state.otth = 0; }
+  }
+};
+
+// --- a=45: Vault3 (túlélés) ---
+rooms[45] = {
+  describe() {
+    if (state.otth === 0) {
+      if (!state.kapu) println('Újra a Vault bejáratánál vagy. A kapu tárva-nyitva.');
+      else println('Újra a Vault bejáratánál vagy. A kapu zárva.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'k' || p === 'ny') println('Nem tudsz arra menni a fal miatt.');
+    if (p === 'ker') {
+      if (!state.kaja) {
+        println('Megtalálod az őrök élelmiszer-csomagját. Ez kitart egy pár napig.');
+        state.kaja = true;
+      }
+    }
+    if (p === 'vár' || p === 'var') {
+      if (!state.radio2 || state.katonak) {
+        state.vara = false;
+      } else if (state.kaja) {
+        println('Telik-múlik az idő. Egyszer csak nagy robajt hallasz odakintről.');
+        if (state.kapu) {
+          println('Ösztönödre hallgatva nem nyitod ki a kaput.');
+          println('Hamarosan rájössz, hogy biztosan nem a FoD jött. A hangokból ítélve a');
+          println('retinavizsgálót akarták használni, de nem jött be nekik. Jó hogy szétverted.');
+          println('Így csak belülről lehet kinyitni a kaput. Hiába lövik az ajtót, semmi hatás.');
+          println('Megpróbálják kirobbantani, de ez se megy nekik. Hiába, ők csinálták ilyen');
+          println('feltörhetetlen diónak. Egy pár óra múlva nem hallasz több hangot. Valószínűleg');
+          println('elvonultak.');
+          state.katonak = true;
+        } else {
+          printDeath('A katonák bejönnek a kapun. Sortűzzel fogadnak.');
+          state.a = 1;
+        }
+      } else {
+        println('A gyomrod korogni kezd. Kéne valami ennivalót keresni.');
+      }
+    }
+    if (p === 'é') { state.otth = 0; state.a = 44; }
+    if (p === 'd') {
+      if (state.katonak) {
+        printDeath('Amint kilépsz, sortűz fogad. Mégsem mentek el.');
+        state.a = 1;
+      } else {
+        println('Nem kéne elhagynod a biztonságos óvóhelyet.');
+      }
+    }
+  },
+  hasznal(th) {
+    if (th === 'kap') {
+      println('Bezárod a kaput. Nagyon bölcs cselekedet.');
+      state.kapu = true;
+      state.use = true;
+    }
+  }
+};
+
+// --- a=46: Hadosztály (cutscene) ---
+rooms[46] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Megmenekültetek. A főhadiszállásra visznek titeket. Miután rádión megkapták');
+      println('a titkos bázisok helyeit, azonnal megszervezték a kifüstölésüket. Te sem tudsz');
+      println('sokáig pihenni, másnap már indulnod kell a 25. hadosztállyal az egyik bunker');
+      println('ellen. Meglepetésetekre nem sok katona védi a létesítményt, és azok is nemsokára');
+      println('halottak. Az itt talált fegyvereket magatokkal viszitek, a foglyokat mind');
+      println('kiszabadítjátok. Temérdek hadi felszerelést zsákmányoltok. Estére jön a');
+      println('jelentés, hogy a többiek is sikeres támadásokat hajtottak végre. A zsarnok');
+      println('ereje megtört. Már késő éjjel van, mire nyugovóra térsz. Mégsem tudsz aludni,');
+      println('mert nem hagy nyugodni a gondolat, hogy miért védték ilyen kevesen a raktárokat.');
+      println('Az uralkodó ennyire elbizakodott lett volna?');
+      println('');
+      println('Miközben ezen gondolkodol, furcsa zajokra leszel figyelmes, majd ordítozásra');
+      println('és rémült visításokra. Kibújsz a sátradból, és ami kint fogad, őrült félelemmel');
+      println('tölt el. Olyan lények vannak mindenütt, melyekhez foghatót még rémálmaidban');
+      println('sem láttál. Béka és ember közti átmenetet képező szörnyek, akkora karmokkal,');
+      println('mint egy emberi ujj. Az emberek fejvesztve menekülnek, amerre látnak.');
+      printDeath('Legtöbbjüket már lemészárolták ezek a rettenetes szörnyek. Rád eddig nem');
+      printDeath('figyeltek fel.');
+      state.otth = 0;
+      state.a = 47;
+    }
+  },
+  command() {}
+};
+
+// --- a=47: Pokoltábor ---
+rooms[47] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A pokoltáborban vagy. Vér és jajgatás mindenütt.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') {
+      printDeath('Egy békaember felfigyel rád. Odajön hozzád. Te mozdulni se tudsz félelmedben.');
+      printDeath('Mélyen beléd ereszti karmait.');
+      state.a = 1;
+    }
+    if (p === 'ker') println('Erre most nincs idő!');
+    if (p === 'k' || p === 'ny' || p === 'd') { state.a = 48; state.otth = 0; }
+    if (p === 'é') { state.otth = 0; state.a = 49; }
+  }
+};
+
+// --- a=48: Tábor halál ---
+rooms[48] = {
+  describe() {
+    printDeath('Próbálsz erre menekülni, de az egyik lény elkap és karmaival felvágja a hasadat.');
+    printDeath('A beleid kiömlesznek felvágott hasadon.');
+    state.a = 1;
+  },
+  command() {}
+};
+
+// --- a=49: Mocsár ---
+rooms[49] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Sikerül észrevétlenül kimenekülnöd a táborból. Befutsz a mocsárba. Nádak közt');
+      println('futsz tovább, közben imádkozol, nehogy összetalálkozz eggyel itt. Az ingoványban');
+      println('sokkal otthonosabbak mint te.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') {
+      printDeath('A tábor zaja nemsokára elhalkul. Félelsz, és egyre közeledő léptek zaját hallod.');
+      printDeath('A szörnyek erre akarnak távozni! Nemsokára meglátod őket, amint lassan');
+      printDeath('bandukolnak tefeléd. Az egyik észrevesz és felordít. A lények martaléka leszel.');
+      state.a = 1;
+    }
+    if (p === 'é') { println('Sikerül kijutnod az ingoványból.'); state.a = 50; state.otth = 0; }
+    if (p === 'd') { printDeath('Visszakerülsz a táborba. Az egyik lény azonnal végez veled.'); state.a = 1; }
+    if (p === 'k' || p === 'ny') {
+      printDeath('Nem vigyázol hova lépsz. Véletlenül belegázolsz a futóhomokba.');
+      state.a = 1;
+    }
+  }
+};
+
+// --- a=50: Szurdok ---
+rooms[50] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy mély vízmosás legalján vagy. A Hold fénye nem nagyon tud ide levilágítani.');
+      if (!state.tars) println('Tőled jobbra valami mozgolódik.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') {
+      printDeath('Vársz egy ideig, aztán zajokat hallasz. A holdfényben meglátsz egy csapat');
+      printDeath('békaembert. Ők is meglátnak téged. Nem tudsz elmenekülni.');
+      state.a = 1;
+    }
+    if (p === 'ker') {
+      if (!state.tars) {
+        state.tars = true;
+        println('Ez az egyik bajtársad! Majdnem rád támad, amikor közeldsz felé, de észreveszi');
+        println('hogy egy ember az.');
+        println('- Uram Isten, azt hittem te is egy olyan lény vagy. Hogy kerülhettek ide?');
+        println('- Nem tudom.');
+        println('- Sietnünk kell, mert lehet hogy erre jönnek. Úgy hallom, a táborban már');
+        println('végeztek.');
+        println('És tényleg. A tábor zaja eláll. A gyomrod is felfordul, amint arra gondolsz, mi');
+        println('lett társaid sorsa.');
+      } else {
+        println('Erre most nincs idő!');
+      }
+    }
+    if (p === 'k' || p === 'ny') println('Elállja utadat a vízmosás fala.');
+    if (p === 'd') { printDeath('Visszakerülsz az ingoványba, és szembe találod magad egy csapat szörnnyel.'); state.a = 1; }
+    if (p === 'é') {
+      if (state.tars) {
+        state.a = 51; state.otth = 0;
+      } else {
+        println('Próbálsz menekülni a lények elől. El is tudsz, szerencédre egy sem kap el.');
+        println('Másnap reggel tovább vándorolsz. Életed hátralévő részét így töltöd. Néha');
+        println('elgondolkozol azon, vajon sikerült-e megdönteni a zsarnok uralmát, de ez már');
+        println('nem a te gondod.');
+        state.a = 1;
+      }
+    }
+  }
+};
+
+// --- a=51: Pokoltábor2 (visszatérés) ---
+rooms[51] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Valahogyan visszakerültetek a táborba. A szörnyek már elmentek, legalábbis nem');
+      println('láttok egyet sem. Mindenhol csúfosan megcsonkított holttestek. Nyugatra a vezér');
+      println('sátra van, keletre látod a hadtest rádióját.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'd') { printDeath('A vízmosásba kerültök megint. Csakhogy tele van békaemberekkel.'); state.a = 1; }
+    if (p === 'é') { printDeath('Az ingoványba futtok. Legnagyobb sajnálatotokra ott tanyázik egy rakás szörny.'); state.a = 1; }
+    if (p === 'k') { state.a = 52; state.otth = 0; }
+    if (p === 'ny') { state.a = 53; state.otth = 0; }
+    if (p === 'ker') {
+      println('Te hullagyalázó! Na mindegy. Néhány személyes tárgyon kívül a holtaknál a');
+      println('szokásos felszerelést találod: valamilyen fegyver, lőszer hozzá és egy rádió.');
+    }
+  }
+};
+
+// --- a=52: Rádió ---
+rooms[52] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A tábori rádiónál vagytok. Társad volt a rádiós, hát most odamegy és megpróbálja');
+      println('beüzemelni. Nem megy neki. Tönkrement. Jobb híján tehát megteszi a saját rádiód');
+      println('is. Valamiért azonban nem sikerül kapcsolatot létesíteni a többi századdal. A');
+      println('legtöbb helyen csak sistergést hallotok, néhol géppuskaropogást és sikolyokat.');
+      println('A többieket is megtámadták.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'é' || p === 'k') { state.a = 54; state.otth = 0; }
+    if (p === 'd') { state.a = 53; state.otth = 0; }
+    if (p === 'ny') { state.a = 51; state.otth = 0; }
+  }
+};
+
+// --- a=53: Százados sátra ---
+rooms[53] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A százados sátránál vagytok. A százados holtan fekszik bent.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') {
+      if (!state.blackgun) {
+        println('Megtalálod a jelentését:');
+        println('"Az akciót sikeresen végrehajtottuk. A célpont megsemmisítve. Emberi veszteség');
+        println('nincs." Hát igen, ez még akkor volt. Ezenkívül találsz még egy érdekes tárgyat.');
+        println('Úgy néz ki, mint egy kis pisztoly, tehát elteszed. Jól jöhet még.');
+        addItem('???');
+        state.blackgun = true;
+      }
+    }
+    if (p === 'k') { state.a = 51; state.otth = 0; }
+    if (p === 'é') { state.a = 52; state.otth = 0; }
+    if (p === 'd' || p === 'ny') println('Erre elviselhetetlen a rothadás szaga.');
+  }
+};
+
+// --- a=54: Mező (Act 2 finálé) ---
+rooms[54] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Elhagyjátok a tábort, és azt látod, hogy a társad valamit csinál a rádióval, amit');
+      println('neki adtál. Rákérdezel, hogy mit csinál vele, erre csak ennyit mond: "Asszem');
+      println('elromlott. Megpróbálom megjavítani." Hagyod, hadd csinálja. Egyszerre egy heli-');
+      println('kopter hangjára leszel figyelmes. Meg is látod a gépet, és amint közelebb ér, lead');
+      println('egy sorozatot rád. Épphogy sikerül elugranod. Intesz a társadnak, hogy jöjjön, de');
+      println('ő csak áll egy helyben. A helikopterből leeresztenek egy kötéllétrát, és odare-');
+      println('pülnek hozzá. Ő felmászik a kötélen. Mikor utoljára látod az arcát, kárörvendő');
+      println('mosollyal néz rád. Majd eltűnik a helikopterben. A gépmadár megfordul, és újra');
+      println('feléd jön. Te megint kikerülöd a golyózáport. Erre leszállnak tőled kb. 50 m-re.');
+      println('Kijön két fegyveres katona és elindulnak feléd. Nincs esélyed ellenük, mert egy');
+      println('darab töltényed sincs. Hát akkor itt. Becsukod szemeidet, és vigyázba állsz.');
+      println('Büszkén akarsz távozni a világból.');
+      println('');
+
+      if (!state.blackgun) {
+        printDeath('Meghaltál.');
+        state.a = 1;
+      } else {
+        // BlackGun megmenti!
+        // Frissítjük a ??? tárgyat
+        const idx = state.lista.indexOf('???');
+        if (idx !== -1) state.lista[idx] = 'Mr. Black titkos fegyvere (tönkrement)';
+        state.blackgun2 = true;
+        updateInventory();
+
+        println('Egyszer csak óriási fény borít be mindent. Mikor a fény eltűnik, kinyitod');
+        println('szemeidet. A katonák holtan fekszenek. A helikopter rotorja még forog. Közelebb');
+        println('mész, és látod, hogy bent is mindenki halott. Ekkor eszedbe jut, hogy az előbb');
+        println('vigyázállás közben valami keményet éreztél a zsebedben (Nem, te perverz kismalac,');
+        println('most nem arról van szó!). Kiveszed, és felismered benne azt a különös tárgyat,');
+        println('amit a századosnál találtál. A fénynél megvizsgálva észreveszed, hogy van rajta');
+        println('egy nagy piros gomb. Ezt nyomhattad meg véletlenül. Ezenkívül apró betűkkel rá');
+        println('van írva: "Mr. Black titkos fegyvere. Használati útmutató: Ha nagy szarban van,');
+        println('nyomja meg a piros gombot. Csak vészhelyzet esetére." Az égiek megint megkímélték');
+        println('életed. És még egy ajándékot is adtak: egy helikoptert! Mivel kiképzésed alatt');
+        println('megtanultál helikopterezni, beszállsz a gépbe. A hullákat kilökdöd és elindulsz.');
+        println('');
+        printSystem('[ Nyomj ENTER-t a folytatáshoz ]');
+        state.otth = 1;
+        state._mezoContinue = true;
+      }
+    }
+  },
+  command() {
+    if (state._mezoContinue) {
+      state._mezoContinue = false;
+      println('');
+      println('Még a fejedben vannak a zsarnok palotájának koordinátái. Teszünk egy látogatást');
+      println('öreg barátodnál, megköszönni neki a 30 év robotolást.');
+      println('Pár óra múlva eléred célpontodat. A légvédelmi rakéták azonnal elindulnak feléd.');
+      println('Az első kettőt sikerül kikerülnöd, majd megint használod a titkos fegyvert. Több');
+      println('rakétát nem lőnek ki. Robotvezérlésre kellett volna tervezni. Ekkor figyelsz');
+      println('fel a palotára. Ez a legszebb építmény, amit valaha is láttál. És a legnagyobb.');
+      println('Az egészet színarany bevonat borítja. Miután magadhoz térsz a látványtól, arra');
+      println('kell gondolnod, vajon hány ember verítékébe és vérébe került a megépítése. Ezért');
+      println('fizetni fog. Minden bűnéért fizetni fog.');
+      println('A palotából hirtelen több száz katona özönlik ki. A palota falán nem tudott');
+      println('áthatolni a sugár. De amint az utolsó is kiért, megint megnyomod a piros gombot.');
+      println('A katonák holtan esnek össze. De a titkos fegyver is sisteregni kezd, majd füst');
+      println('száll ki belőle. Ezt már nem fogod használni.');
+      println('');
+      printSuccess('=== A 2. felvonás véget ért ===');
+      println('');
+      printSystem('A 3. felvonás (Act 3) a palotában folytatódik...');
+      state.a = 55; // Act 3 start
+      state.otth = 0;
+    }
+  }
+};
+
+// --- a=12: Folyosó ---
+rooms[12] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A folyosón állsz. Dél felé olyan 50 méterre egy nagy ajtót látsz.');
+      println('Keletre egy másik kabin ajtaját látod. A folyosó észak felé folytatódik.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (p === 'ny') { state.a = 10; state.otth = 0; }
+    if (p === 'k') { state.a = 13; state.otth = 0; }
+    if (p === 'd') { state.a = 14; state.otth = 0; }
+    if (p === 'é') { state.a = 15; state.otth = 0; }
+  }
+};
+
+// --- a=13: Kabin2 ---
+rooms[13] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy másik kabinban vagy. Tök ugyanolyan mint a tiéd.');
+      println('A kabin gazdája mélyen alszik.');
+      println('A kijárat nyugat felé van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = true;
+    if (p === 'vár' || p === 'var') println('Az újonc hangosan horkol. Ez rohadtul idegesít.');
+    if (p === 'ker') println('Nono! Nem lopunk más tulajdonából!');
+    if (p === 'ny') { state.otth = 0; state.a = 12; }
+    if (p === 'é' || p === 'k' || p === 'd') println('Otthon is neki szoktál rohanni a falnak?');
+  }
+};
+
+// --- a=14: Zsákutca ---
+rooms[14] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy újabb acélajtó előtt állsz.');
+      println('Észak felé tudsz visszamenni.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (p === 'k' || p === 'ny') println('Nem tudsz erre menni.');
+    if (p === 'é') { state.otth = 0; state.a = 12; }
+    if (p === 'd') {
+      println('Az ajtó be van zárva.');
+      if (hasItem('kulcs')) {
+        println('A kulccsal ki tudtad nyitni a zárat.');
+        state.a = 16;
+        state.otth = 0;
+      }
+    }
+  }
+};
+
+// --- a=15: Kereszteződés ---
+rooms[15] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A folyosó itt két felé ágazik. A keleti ág nagyon sötét, szóval nem látsz');
+      println('semmit. A nyugati az ebédlőhöz vezet.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (p === 'd') { state.otth = 0; state.a = 12; }
+    if (p === 'é') println('Ne menj neki a falnak!');
+    if (p === 'k') { state.otth = 0; state.a = 17; }
+    if (p === 'ny') { state.otth = 0; state.a = 19; }
+  }
+};
+
+// --- a=17: Sötét folyosó ---
+rooms[17] = {
+  describe() {
+    if (state.sote === 0 && state.otth === 0) {
+      println('Nem látsz semmit, de tapogatózva tovább jutsz. Nemsokára a folyosó véget ér.');
+      println('Észreveszel egy kilincset.');
+      state.otth = 1;
+    }
+    if (state.sote === 1 && state.otth === 0) {
+      println('A sötétben állsz. Erről a helyről a Pitch Dark című film jutna az eszedbe, ha');
+      println('láttad volna valaha.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = true;
+    if (p === 'vár' || p === 'var') println('Nem félsz a sötétben? Pedig jobb félni mint megijedni.');
+    if (p === 'ker') println('Még magadat se látod! Hogy akarsz itt keresni bármit?');
+    if (p === 'é' || p === 'd') println('Most már legalább tudod, hol a fal.');
+    if (p === 'ny') { state.otth = 0; state.a = 15; }
+    if (p === 'k') {
+      if (state.sote === 0) {
+        state.a = 18;
+        state.otth = 0;
+      } else {
+        println('Nem tudod kinyitni az ajtót, mert lejött a kilincs.');
+      }
+    }
+  }
+};
+
+// --- a=18: Könyvtár ---
+rooms[18] = {
+  describe() {
+    state.sote = 1;
+    if (state.otth === 0) {
+      println('Az ajtó nyikorogva nyílik ki. A rozsdás kilincs a kezedben marad. Egy kis');
+      println('ablakon jön be valamennyi napfény, de nem túl sok. Pókhálók mindenütt. Óriási');
+      println('polcokat látsz, tele könyvekkel, és egy asztalt. Az asztalnál egy őszszakállú');
+      println('öregember alussza az igazak álmát (valószínűleg már jó ideje.)');
+      println('Nyugat felé tudsz visszamenni.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = true;
+    if (p === 'vár' || p === 'var') println('Az öregember csak horkol, csak horkol, csak horkol ...');
+    if (p === 'ker') {
+      if (state.konyv === 0) {
+        println('Nagy zajt csapsz, és sikeresen felébreszted az öreget.');
+        println('-Mit keresel itt? Ki vagy te? -néz rád kérdőn.');
+        println('Készségesen elmagyarázol neki mindent, és megkérded tőle hogy hol vagy.');
+        println('- A bázis könyvtárában. Mint láthatod, eléggé kevesen járnak erre.');
+        println('Majd invitál, hogy nézd meg a könyveit.');
+        state.konyv = 1;
+      } else {
+        state.ker = false;
+      }
+    }
+    // Ha van könyv ÉS necro
+    if (state.konyv === 1 && state.necro === 1 && p === 'ker') {
+      // Handled above, now check book event
+    }
+    // Könyv esemény a describe után
+    if (state.konyv === 1 && state.necro === 1) {
+      println('Eszedbe jut a könyv, amit otthon találtál és megmutatod neki. Kezébe veszi, és');
+      println('lesápad arcáról a mosoly.');
+      println('-Honnan szerezted ezt??');
+      println('Elmondod hogy a családodé volt századok óta.');
+      println('-Ez az őrült arab, Abdul Alhazred rettenetes Necronomiconja! Méghozzá egy arab');
+      println('nyelvű példány! Ezt a könyvet meg kell semmisíteni, mert veszélyt jelent az');
+      println('emberiségre!');
+      println('Hiába ellenkezel, hajthatatlan. A könyvet elteszi egy fiókba.');
+      println('-És most viszlát.');
+      println('És kitessékel a könyvtárból.');
+      removeItem('könyv');
+      state.oreg = true;
+      state.otth = 0;
+      state.a = 17;
+      return;
+    }
+    if (state.konyv === 1 && state.necro === 0) {
+      println('Eszedbe jut, hogy otthon volt egy ősi könyved, ami ismeretlen nyelven volt');
+      println('írva. Ha elhoztad volna, megmutathatnád a könyvtárosnak. Na mindegy.');
+    }
+    if (p === 'ny') {
+      if (state.konyv === 1) {
+        state.otth = 0;
+        state.a = 17;
+      } else {
+        println('Talán előbb fel kéne ébreszteni az öreget!');
+      }
+    }
+    if (p === 'é' || p === 'k' || p === 'd') println('Mindenütt csak falak.');
+  }
+};
+
+// --- a=19: Ebédlő ---
+rooms[19] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Az ebédlőben vagy. Rengeteg asztalt látsz itt, de mindegyik üres. Senki sincs');
+      println('itt. Északra viszont meglátod a konyha bejáratát.');
+      println('Kelet felé van a kijárat.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = false;
+    if (p === 'vár' || p === 'var') println('Leülsz egy asztalhoz, de senki sem hoz kaját. Micsoda pofátlanság!');
+    if (p === 'k') { state.otth = 0; state.a = 15; }
+    if (p === 'ny' || p === 'd') println('Arra csak a fal van.');
+    if (p === 'é') {
+      if (state.konyh === 0) {
+        state.otth = 0;
+        state.a = 20;
+      } else {
+        println('Nem tudsz bemenni a konyhába. Valaki bezárta.');
+      }
+    }
+  }
+};
+
+// --- a=20: Konyha ---
+rooms[20] = {
+  describe() {
+    state.konyh = 1;
+    println('A konyhában vagy. Egy szakács ül itt és nagyban nézi a semmit. Közeledtedre');
+    println('felkapja a fejét:');
+    println('-Mit keresel itt???');
+    println('-A kiképzőtermet keresem.');
+    println('-Menj vissza a folyosóra, és a kabinoknál van egy ajtó. Arra kell menni.');
+    println('-De az be van zárva!');
+    println('A szakács sóhajt egyet.');
+    println('-Tessék itt a kulcs.');
+    println('És átnyújt neked egy biztonsági kártyát.');
+    println('-De most már menjél innen! Sok a dolgom.');
+    println('És kitessékel a konyhából.');
+    addItem('kulcs');
+    state.a = 19;
+    state.otth = 0;
+  },
+  command() {}
+};
+
+// --- a=16: Belső folyosó ---
+rooms[16] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Újabb folyosón vagy. Egy nagyon-nagyon hosszú folyosón. Keletre látsz egy');
+      println('ajtót valami felirattal rajta. A folyosó dél felé folytatódik.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (state.targy === 'ajt') {
+      println('Az ajtóra az van írva: FoD HQ. Belépés csak arra jogosultaknak.');
+      state.targ = 4;
+    }
+    if (p === 'ny') println('Csak falat látsz erre.');
+    if (p === 'é') { state.otth = 0; state.a = 14; }
+    if (p === 'k') { state.otth = 0; state.a = 22; }
+    if (p === 'd') { state.otth = 0; state.a = 21; }
+  }
+};
+
+// --- a=21: Hosszú folyosó ---
+rooms[21] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A hosszú folyosón vagy. Északra van a bejárat. Keletre egy ajtót látsz, rá van');
+      println('írva: Kiképzőterem.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (p === 'é') { state.otth = 0; state.a = 16; }
+    if (p === 'd' || p === 'ny') println('Nincs arra semmi.');
+    if (p === 'k') { state.otth = 0; state.a = 11; }
+  }
+};
+
+// --- a=22: Előtér ---
+rooms[22] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy 6 méter magas bronzajtó előtt állsz. Rajta írások vannak. Egy koponya');
+      println('alakú kopogtatót is látsz.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (state.targy === 'ajt') {
+      state.targ = 4;
+      println('A feliratok:');
+      println('"Ki itt belépsz, hagyj fel minden reménnyel"');
+      println('"A FoD ellenségei: Rozsdás');
+      println('                   IV. Shaddam"');
+    }
+    if (p === 'é' || p === 'd') println('Semmi sincs erre.');
+    if (p === 'ny') { state.otth = 0; state.a = 16; }
+    if (p === 'k') {
+      println('Nagy erőfeszítések árán sikerül kinyitnod a bronzajtót.');
+      state.otth = 0;
+      state.a = 23;
+    }
+  }
+};
+
+// --- a=23: Belső tér ---
+rooms[23] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy nagy téren állsz. Középen egy szökőkút. A falak gazdagon díszítettek,');
+      println('különleges kardok, pajzsok és kaszák(!) vannak rajtuk. A nyugati falon egy');
+      println('festményt találsz, amely Caesar meggyilkolását jeleníti meg. Ezenkívül három');
+      println('ajtó nyílik innen, északi, déli és keleti irányban.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (state.targy === 'kép') {
+      println('Az aljára oda van írva: "Ez lesz veled is, Shaddam!!"');
+      state.targ = 4;
+    }
+    if (state.targy === 'kút' || state.targy === 'szö') {
+      state.targ = 4;
+      println('Nagyon érdekes: egy hiéna szájából jön ki a víz.');
+    }
+    if (state.targy === 'kar') {
+      state.targ = 4;
+      println('A markolatuk egy Quake-jelet formáz. Persze te nem tudod mi az a Quake.');
+    }
+    if (p === 'k') { state.otth = 0; state.a = 24; }
+    if (p === 'ny') { state.otth = 0; state.a = 22; }
+    if (p === 'é') { state.a = 26; state.otth = 0; }
+    if (p === 'd') { state.a = 25; state.otth = 0; }
+  }
+};
+
+// --- a=24: Hadiszoba ---
+rooms[24] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy kicsi szobában vagy. Középen egy nagy asztal van, rajta a környék');
+      println('domborzati térképe 3D-ben. Különböző színű bábuk jelentik a császári ill.');
+      println('ellenállási seregeket. Amint láthatod, a császáriak sokkal előnyösebb');
+      println('helyzetben vannak.');
+      println('Nyugat felé tudsz visszamenni.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (p === 'é' || p === 'k' || p === 'd') println('Élvezed hogy nekirohansz a falnak? Klinikai eset vagy.');
+    if (p === 'ny') { state.otth = 0; state.a = 23; }
+  }
+};
+
+// --- a=25: Tanácsterem ---
+rooms[25] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy tágas terembe érkezel. Egy óriási faasztal van középen, körülötte 10-15');
+      println('szék. Az asztalra a FoD címere van vésve. A nyugati falon egy világtérképet');
+      println('látsz, piros X-szel jelölve egy helyet.');
+      println('A kijárat északra van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (state.targy === 'tér') {
+      state.targ = 4;
+      println('Látod hogy az X alá van írva: Az uralkodó palotája. "Destroy!!"');
+    }
+    if (p === 'd' || p === 'k' || p === 'ny') println('Tudtad hogy fáj ha nekirohansz a falnak? Ja, hogy ezért csinálod?');
+    if (p === 'é') { state.otth = 0; state.a = 23; }
+  }
+};
+
+// --- a=26: Irodák ---
+rooms[26] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy újabb folyosóra érkezel. Kétoldalon 5-5 ajtó van, mindegyiken valami');
+      println('felirat. Északra, a folyosó végén egy teljesen fekete színű ajtót látsz.');
+      println('Keletre van egy ajtó, amire az van írva: Mersant.');
+      println('A nyugati ajtóra Fas(z)ter van írva.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (state.targy === 'ajt') {
+      state.targ = 4;
+      println('Mersant, Faster, Galan Dracos, Mistake, Muff, Snowman, Goldenking, Ranti, Rebel.');
+      println('Csupa számodra ismeretlen név. A folyosó végi ajtóra ez van írva:');
+      println('BlackEvil the Hyena.');
+    }
+    if (p === 'd') { state.otth = 0; state.a = 23; }
+    if (p === 'é') {
+      if (state.black === 0) {
+        state.otth = 0;
+        state.a = 29;
+      } else {
+        println('Be van zárva.');
+      }
+    }
+    if (p === 'k') { state.otth = 0; state.a = 27; }
+    if (p === 'ny') { state.otth = 0; state.a = 28; }
+  }
+};
+
+// --- a=27: Mersant irodája ---
+rooms[27] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Mersant Nagyúr irodájában vagy. Senki sincs itt, Lord Mersant fontos');
+      println('kiküldetésen van. Az íróasztalán viszont egy érdekes papírt látsz. Mellette egy');
+      println('tekercs fekszik.');
+      println('A kijárat nyugatra van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (state.targy === 'pap') {
+      state.targ = 4;
+      println('Azt írja: "A FoD története. Írta FoD_Mersant');
+      println('          A FoD 1999-ben alakult. Először hardcore quake klán lett volna, de');
+      println('          később sokkal több értelme lett. A kezdeti 7 taghoz 2000-ben jött');
+      println('          Faster, aki kiváló grafikus és a címer is az ő keze munkája. 2001-ben');
+      println('          lépett be Galan Dracos és Rebel. Ekkoriban fogalmazódott meg a');
+      println('          klántörvénykönyv először. Sokáig eseménytelen időszak volt a klán');
+      println('          életében, egészen a 2077-es Nagy Háborúig, amikor is Shaddam magához');
+      println('          ragadta az uralmat. Ekkor a FoD ellenállási mozgalom lett. Hadsereget');
+      println('          szerveztünk és megépítettük a bázisunkat. Azóta harcolunk az elnyomás');
+      println('          ellen, és reméljük, hogy egy napon majd győzünk."');
+      println('Eddig a szöveg.');
+    }
+    if (state.targy === 'tek') {
+      state.targ = 4;
+      println('Az van ráírva: Sötét tanok. Kinyitod az első lapon, ahova oda van írva: Halandó');
+      println('aki ezt a könyvet kezedbe veszed, tudd, nagy kockázatot vállalsz. Olyan tudás');
+      println('van benne, amely sérti az elme épségét, és könnyen a káosz szolgájává tesz.');
+      println('Úgy döntesz, inkább leteszed.');
+    }
+    if (p === 'é' || p === 'd' || p === 'k') println('Már megint ezek a kemény falak.');
+    if (p === 'ny') { state.otth = 0; state.a = 26; }
+  }
+};
+
+// --- a=28: Faster irodája ---
+rooms[28] = {
+  describe() {
+    if (state.otth === 0) {
+      state.otth = 1;
+      println('A Grafikus irodájában vagy. A falon nagy művei (a címer, a Wild Disney képek');
+      println('etc.) vannak kifüggesztve. Az íróasztalon egy magnó van.');
+      println('Az ajtó keletre van.');
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false;
+    state.ker = false;
+    if (state.targy === 'mag') {
+      state.targ = 4;
+      println('Elindítasz egy kazit. Persze Metallica van rajta.');
+    }
+    if (state.targy === 'kép') {
+      state.targ = 4;
+      println('Megpróbálod leszedni a képeket, ezzel beindítasz egy biztonsági mechanizmust,');
+      printDeath('aminek hatására egy balta jön ki a falból és levágja a fejedet.');
+      state.a = 1;
+    }
+    if (p === 'é' || p === 'd' || p === 'ny') println('Már megint ezek a kemény falak.');
+    if (p === 'k') { state.otth = 0; state.a = 26; }
+  }
+};
+
+// --- a=29: BlackEvil szobája ---
+rooms[29] = {
+  describe() {
+    if (state.otth === 0) {
+      state.otth = 1;
+      println('Belépsz az ajtón. Mielőtt észbe kapnál, neked ugrik egy hiéna. Semmi esélyed');
+      println('két mázsás hím ellen (génmanipulált). Minden elsötétül.');
+      println('Egyszer csak egy hangot hallasz:');
+      println('-Zarak, lábhoz!');
+      println('A hiéna engedelmesen elengedi a nyakadat. Feltápászkodsz, és látod, hogy');
+      println('BlackEvil szobájában vagy. BlackEvil az asztalánál ül. Hiénája hűségesen ül');
+      println('mellette, de nagyon gyanúsan méreget.');
+      println('-Látom eltaláltál ide is. Tudom, hogy ki vagy. Egy újonc akinek semmi keresni-');
+      println(' valója nem lenne itt. De neked kivételesen most megkegyelmezek.');
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true;
+    state.ker = false;
+    if (p === 'vár' || p === 'var') {
+      printDeath('Na ezt nem kellett volna.');
+      state.a = 1;
+    }
+    if (p === 'é' || p === 'ny') println('Belerohansz a falba. Black eléggé furcsán néz rád.');
+    if (p === 'k') { state.black = 1; state.otth = 0; state.a = 26; }
+    if (p === 'd') println('Belerohansz a falba. Black eléggé furcsán néz rád.');
+  }
+};
+
+// ============================================================
+// ACT 3 SZOBÁK
+// ============================================================
+
+// --- a=55: Palota előtt ---
+rooms[55] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A palota előtti téren vagy. Körülötted száz meg száz holttest hever. Keletre');
+      println('van a helikoptered, északra a palota bejárata. Délre és nyugatra az őrök');
+      println('szálláshelyei vannak.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'é') { println('Nagy nehezen felmász a 2-3000 lépcsőn.'); state.a = 60; state.otth = 0; }
+    if (p === 'k') {
+      println('Úgy döntesz ez túl kemény hely neked. A helikopterrel elhúzol és soha');
+      println('többé nem jössz a palota közelébe.');
+      state.a = 1;
+    }
+    if (p === 'd') { state.otth = 0; state.a = 56; }
+    if (p === 'ny') { state.otth = 0; state.a = 59; }
+  }
+};
+
+// --- a=56: Őrbódé 1 ---
+rooms[56] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Az őrök egyik szálláshelye. Több mint száz ágy és hozzá tartozó szekrény van itt.');
+      println('Északra van a kijárat. Keletre látsz egy 50 férőhelyes zuhanyzót. Nyugatra egy');
+      println('még nagyobb WC-t (a testi higiénia hanyagolható).');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') println('A szekrényekben csak személyes holmikat és 1-1 Playboy-t találsz.');
+    if (p === 'é') { state.otth = 0; state.a = 55; }
+    if (p === 'd') println('Valaki neked jött! Ja, csak a fal.');
+    if (p === 'k') { state.otth = 0; state.a = 57; }
+    if (p === 'ny') { state.otth = 0; state.a = 58; }
+  }
+};
+
+// --- a=57: Zuhanyzó ---
+rooms[57] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A zuhanyzóban vagy. 50 ember is elférne itt, ha ketten állnak egy zuhanyzóba,');
+      println('(ez itt gyakori eset lehet) akkor akár 100 is (gondoltad volna?).');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('A várakozás megkönnyítésére lezuhanyzol. Most szép tiszta vagy.');
+    if (p === 'ker') {
+      println('Találsz egy poharat, és megízleled belőle ezt a csudálatos H2O-t. Ha az ÁNTSZ');
+      println('létezne, biztos betiltaná ezt a helyet. A víztől erős hasmenés jön rád.');
+      state.a = 58; state.otth = 0;
+    }
+    if (p === 'é' || p === 'k' || p === 'd') println('Minduntalan falba ütközöl.');
+    if (p === 'ny') { state.a = 56; state.otth = 0; }
+  }
+};
+
+// --- a=58: WC ---
+rooms[58] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A WC-ben vagy. Az ilyen helyeken megszokott szag terjeng a levegőben. 150 db');
+      println('WC kagyló van itt, és 350 piszoár. Biztos sokat járnak vécére.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') println('Találsz egy fogkefét és megtisztítod ezt a helyet vele. Pár hét múlva végzel.');
+    if (p === 'é' || p === 'd' || p === 'ny') println('Minduntalan falba ütközöl.');
+    if (p === 'k') { state.a = 56; state.otth = 0; }
+  }
+};
+
+// --- a=59: Őrbódé 2 (rakétavezérlő) ---
+rooms[59] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Itt tartózkodnak az őrök napközben. Itt van a rakétavezérlő terem, a');
+      println('biztonsági monitorok.');
+      println('Használható tárgyak: rakétavezérlő, monitor');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'd' || p === 'é' || p === 'ny') println('Minduntalan falba ütközöl.');
+    if (p === 'k') { state.a = 55; state.otth = 0; }
+  },
+  hasznal(th) {
+    if (th === 'rak') {
+      println('Kilövöd a rakétákat a palotára. Sajnos nincs nagy hatása. 1-2 torony');
+      println('ledől, de semmi egyéb.');
+      state.use = true;
+    }
+    if (th === 'mon') {
+      println('Az egyiken a háremhölgyek láthatóak. AZANNYA!!! Oda el kéne jutni.');
+      state.use = true;
+    }
+  }
+};
+
+// --- a=60: Palota belső ---
+rooms[60] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A palotában vagy. Hosszú-hosszú folyosók vannak erre. Nem kis feladat lesz');
+      println('megtalálni az uralkodót.');
+      println('Északra van a hárem, keletre a könyvtár és nyugatra egy folyosó.');
+      println('Déli irányban van a kijárat.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') println('Nem találod az uralkodót. Biztos nem itt van.');
+    if (p === 'é') { state.a = 61; state.otth = 0; }
+    if (p === 'k') { state.a = 62; state.otth = 0; }
+    if (p === 'ny') { state.a = 64; state.otth = 0; }
+    if (p === 'd') { state.a = 55; state.otth = 0; }
+  }
+};
+
+// --- a=61: Hárem ---
+rooms[61] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Belépsz egy ajtón, és a földi paradicsomba jutsz. Több száz szebbnél szebb');
+      println('nő van itt. Ez a zsarnok hárme.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('A háremhölgyek zavartan néznek rád. Azt várják, hogy te kezdeményezz.');
+    if (p === 'ker') println('Mégis mit akarsz találni egy háremben?');
+    if (p === 'é' || p === 'k' || p === 'ny') println('Nekimész a falnak. A lányok huncut módon kacagnak.');
+    if (p === 'd') { state.otth = 0; state.a = 60; }
+  }
+};
+
+// --- a=62: Könyvtár (palota) ---
+rooms[62] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy könyvtárba léptél. Több könyv van itt, mint azt el tudnád képzelni.');
+      println('Az öreg könyvtáros rád néz:');
+      println('- Segíthetek valamit fiatalember?');
+      println('- Az uralkodót keresem.');
+      println('- Ilyenkor a fürdőben szokott tartózkodni.');
+      println('Na végre egy használható információ!');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') println('Találsz egy csomó könyvet. Micsoda meglepetés!');
+    if (p === 'd' || p === 'é') println('Nekimész a falnak. A könyvtáros huncut módon kacag.');
+    if (p === 'ny') { state.a = 60; state.otth = 0; }
+    if (p === 'k') { println('Találsz egy kis ajtót és bemász rajta.'); state.a = 63; state.otth = 0; }
+  }
+};
+
+// --- a=63: Olvasóterem (Necronomicon) ---
+rooms[63] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A könyvtár belső helyiségében vagy. Itt őrzik az igazán értékes könyveket.');
+      println('Az ókori mesterek eredeti kéziratai: Platón, Hermész Triszmegisztosz, és');
+      println('az őrült arab, Abdul Alhazred félelmetes Necronomiconja. Nem eredetiben,');
+      println('hanem lefordítva, tehát te is el tudod olvasni.');
+      if (state.necro === 0) {
+        println('Elolvasod, és a képek alapján rájössz, hogy volt neked ilyen otthon is, de az');
+        println('ismeretlen nyelven írták. Elteszed a könyvet.');
+        addItem('Necronomicon');
+        state.necro2 = 1;
+      } else if (state.konyv === 1) {
+        println('A FoD könyvtárosa elvette a tiédet, de mégsem teszed el ezt. Felesleges.');
+      } else {
+        println('Neked már van ilyen, de ezt legalább el tudod olvasni. Elteszed.');
+        addItem('Necronomicon');
+        state.necro2 = 1;
+      }
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'ny') { state.a = 62; state.otth = 0; }
+    if (p === 'é' || p === 'k' || p === 'd') println('Minduntalan falba ütközöl.');
+  }
+};
+
+// --- a=64: Palota2 (folyosó elágazás) ---
+rooms[64] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Továbbmész az egyik folyosón, és itt több ajtóra is bukkansz.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'k') { state.a = 60; state.otth = 0; }
+    if (p === 'ny') { state.a = 65; state.otth = 0; }
+    if (p === 'é') { state.a = 70; state.otth = 0; }
+    if (p === 'd') { state.a = 68; state.otth = 0; }
+  }
+};
+
+// --- a=65: Fürdő ---
+rooms[65] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A fürdőben vagy. A császár nincsen itt. Viszont van egy csomó medence.');
+      println('Északra a szauna bejáratát látod, nyugatra a szoláriumét.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = false;
+    if (p === 'vár' || p === 'var') {
+      println('Kipróbálsz három medencét. A gyógyvizes túl meleg. A hidegvizes túl mély.');
+      println('A harmadik viszont pont jó.');
+    }
+    if (p === 'k') { state.a = 64; state.otth = 0; }
+    if (p === 'é') { state.a = 66; state.otth = 0; }
+    if (p === 'ny') { state.a = 67; state.otth = 0; }
+    if (p === 'd') println('Majdnem beleesel az egyik medencébe.');
+  }
+};
+
+// --- a=66: Szauna ---
+rooms[66] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A szaunában vagy. Itt sincs senki.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = false;
+    if (p === 'vár' || p === 'var') println('Szaunázol.');
+    if (p === 'd') { state.a = 65; state.otth = 0; }
+    if (p === 'é' || p === 'ny' || p === 'k') println('Valaki neked jött! Ja, csak a fal.');
+  }
+};
+
+// --- a=67: Szolárium ---
+rooms[67] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A szoláriumban vagy.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('Egy idő múlva szép cigánybarna lesz a bőröd.');
+    if (p === 'ker') {
+      println('Találsz valakit az egyik helyen. Megpróbálod felkelteni. Rázogatod erre-arra,');
+      println('de nem ébred fel. Megfordítod, és látod, hogy halott. A szolárium teljesen');
+      println('kiszárította. Jobb lesz innen elhúzni.');
+      state.a = 65; state.otth = 0;
+    }
+    if (p === 'k') { state.a = 65; state.otth = 0; }
+    if (p === 'é' || p === 'd' || p === 'ny') println('Ez a rohadt fal mindig neked jön!');
+  }
+};
+
+// --- a=68: Trónterem ---
+rooms[68] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A trónterembe léptél. Akiért jöttél, nincsen itt. Helyette van egy bárd (egy');
+      println('énekes) és egy udvari bolond. Nem sokra mész velük.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('Unalmadban az udvari bolondot nézed. Hát, nem egy Monty Python, de elmegy.');
+    if (p === 'ker') { println('Felfedezel egy titkos ajtót.'); state.a = 69; state.otth = 0; }
+    if (p === 'é') { state.a = 64; state.otth = 0; }
+    if (p === 'd') { println('Felfedezel egy titkos ajtót.'); state.a = 69; state.otth = 0; }
+    if (p === 'k' || p === 'ny') println('A falak már megint kétekszenek.');
+  }
+};
+
+// --- a=69: Titkos szoba (hatalomkulcs) ---
+rooms[69] = {
+  describe() {
+    if (!state.hatalomkulcs) {
+      println('Elég szűkös terembe jutsz. Le kell hajolnod, nehogy beverd a fejed. De a terem');
+      println('közepén felfedezed... A császár hatalmának a kulcsát! Enélkül nem tud');
+      println('uralkodni! Gyorsan elteszed és elhúzol innen.');
+      addItem('hatalomkulcs');
+      state.hatalomkulcs = true;
+    } else {
+      println('Nincs itt már semmi érdekes.');
+    }
+    state.a = 68; state.otth = 0;
+  },
+  command() {}
+};
+
+// --- a=70: Palota3 (nagy terem) ---
+rooms[70] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy nagy terembe érkezel. Több irányba is folytatódik a folyosó.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'd') { state.a = 64; state.otth = 0; }
+    if (p === 'é') { state.a = 74; state.otth = 0; }
+    if (p === 'ny') { state.a = 71; state.otth = 0; }
+    if (p === 'k') { state.a = 72; state.otth = 0; }
+  }
+};
+
+// --- a=71: Börtön ---
+rooms[71] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Ahogy belépsz az ajtón, rengeteg kéz nyúl feléd a rácsok mögül.');
+      println('-Segítség!');
+      println('-Ments meg minket!');
+      println('-Kegyelem!');
+      println('-Adj enni!');
+      println('-Mondd meg az uralkodónak, ne hagyjon minket itt rohadni!');
+      println('És még hasonlók. A foglyok eléggé soványak, és nem látszanak túl egészségesnek.');
+      println('Sok halott is van köztük, a bűz elviselhetetlen.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'ker') println('Sajnos nem találsz semmit, amivel kiszabadíthatnád a rabokat.');
+    if (p === 'vár' || p === 'var') println('A bűz egyre elviselhetetlenebb. Távozni kéne, de gyorsan.');
+    if (p === 'k') { state.a = 70; state.otth = 0; }
+    if (p === 'é' || p === 'd' || p === 'ny') println('Ne menj közelebb a rácsokhoz!');
+  }
+};
+
+// --- a=72: Labor (Dr. Kromek) ---
+rooms[72] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy szokatlan helyiségbe értél. Sok üvegcse és kémcső van itt, tele különböző');
+      println('színű folyadékokkal. Egy fehér köntösbe öltözött úriember fogad.');
+      println('-Koma, mit keresel itt?');
+      println('Azonnal felismered. Ez dr. Kromek, a híres kémikus.');
+      println('-Jó napot tanár úr!');
+      println('-Koma, ne szívd itt a szabad gyökeket! Pepsit adnak neked?');
+      println('-He?? Nem értem, tanár úr!');
+      println('-Koma! Mi a tömeghatás törvénye?');
+      println('-Ááááááááá....');
+      println('-Adjad neki a mínuszt!');
+      println('-De....');
+      println('-Augusztusi ismerős akarsz lenni?');
+      println('-Nem, csak...');
+      println('-Betépem a lapod!');
+      println('-Jaj ne! Nem lestem a szomszédomról!');
+      println('Nincs kegyelem. Betépi a lapodat. Kapsz egy szőröstalpass egyest.');
+      println('-Van kijavítatlan írásbeli?');
+      println('-Persze tanár úr.');
+      println('-Mára ígértem a dolgozatot?');
+      println('-Nem, ma pancsizunk.');
+      println('-Akkor számítsuk ki, hogy kettő egész nulla nulla gramm kutyatejoldatot');
+      println(' összeöntünk kettő köbci Dezoxiribo-nukleinsavval, mennyi lesz az oldat pH-ja?');
+      println('Jobb lesz innen minél hamarabb távozni.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('Kromek előadást tart a Tollens-reagensről. Erős alvási kényszer jön rád.');
+    if (p === 'ker') println('Kromek idegesen nézi, milyen felfordulást okozol.');
+    if (p === 'ny') { state.a = 70; state.otth = 0; }
+    if (p === 'k') { state.a = 73; state.otth = 0; }
+    if (p === 'é' || p === 'd') println('-Koma! Fejeld a falat!');
+  }
+};
+
+// --- a=73: Kémiaszertár ---
+rooms[73] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Beléptél a kémiaszertárba. Ildikó, Kromek csaja rádnéz, és megkérdi, mit');
+      println('szeretnél.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'ny') { state.a = 72; state.otth = 0; }
+    if (p === 'd' || p === 'é' || p === 'k') println('Már megint a fal.');
+  }
+};
+
+// --- a=74: Shaddam szobája ---
+rooms[74] = {
+  describe() {
+    if (!state.saddam) {
+      println('Amint belépsz az ajtón, szemben meglátod az alávaló császárt.');
+      println('-Ne gyere közelebb!');
+      println('Nem is mész. Előkapod fegyveredet és meghúzod a ravaszt. De mire az első lövés');
+      println('eldördül, az uralkodó eltűnt. Viszont azon a helyen, ahol állt, egy pentagramma');
+      println('van a földre rajzolva.');
+      println('');
+      state.saddam = true;
+    }
+    if (state.otth === 0) {
+      println('Egy kicsi szobában vagy. Szemben (északra) egy pentagramma díszleg.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = true;
+    if (p === 'vár' || p === 'var') println('Most nincs időd várni!');
+    if (p === 'ker') println('A szoba teljesen üres, az egy szem pentagrammát kivéve.');
+    if (p === 'é') { state.a = 75; state.otth = 0; }
+    if (p === 'd') { state.a = 70; state.otth = 0; }
+    if (p === 'k' || p === 'ny') println('Egy nagy fehér tömb elzárja utadat.');
+  }
+};
+
+// --- a=75: R'lyeh teleport ---
+rooms[75] = {
+  describe() {
+    println('Minden elsötétül. Semmit sem látsz. Már kezded azt hinni, meghaltál. Egyszer');
+    println('csak nagy fényességet látsz, ami egyre közeledik. Végül nagyot esel, és újra');
+    println('föld van alattad. Körbemézl, és a látvány megigéz. Egy trópusi szigeten vagy.');
+    state.a = 76; state.otth = 0;
+  },
+  command() {}
+};
+
+// --- a=76: Sziget közép ---
+rooms[76] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy nagy hegyet látsz nyugatra. Délre van a tengerpart, északra mintha');
+      println('kunyhókat látnál. Keletre sűrű erdő van.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = false;
+    if (p === 'd') { state.a = 77; state.otth = 0; }
+    if (p === 'é') { state.a = 79; state.otth = 0; }
+    if (p === 'k') { state.a = 78; state.otth = 0; }
+    if (p === 'ny') { state.a = 80; state.otth = 0; }
+  }
+};
+
+// --- a=77: Tengerpart ---
+rooms[77] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A tengerparton vagy. Kagylók és kavicsok fekszenek a homokban. A parttól kb.');
+      println('500 m-re egy nagy korallzátonyt látsz. Északra látod a helyet, ahol megérkeztél.');
+      println('Keletre nagy dzsungel van, nyugatra a vulkán.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') println('Csak kagylókat találsz. Hallhatod bennük a tenger moraját.');
+    if (p === 'é') { state.a = 76; state.otth = 0; }
+    if (p === 'd') { printDeath('Megpróbálsz kiúszni a korallig, de egy cápa elkap.'); state.a = 1; }
+    if (p === 'k') { state.a = 78; state.otth = 0; }
+    if (p === 'ny') { state.a = 80; state.otth = 0; }
+  }
+};
+
+// --- a=78: Dzsungel ---
+rooms[78] = {
+  describe() {
+    if (state.otth === 0) {
+      println('Egy sűrű dzsungelbe érkeztél. A fák nagyon magasak, nem látsz ki tőlük.');
+      println('Meggondolatlan volt idejönni. Ezer veszély leselkedik rád.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = false; state.ker = true;
+    if (p === 'ker') println('Felmászol egy fára és köbülnézel. Északra meglátsz néhány kunyhót.');
+    if (p === 'é') { state.a = 79; state.otth = 0; }
+    if (p === 'ny') { state.a = 77; state.otth = 0; }
+    if (p === 'd') {
+      printDeath('Egyre jobban eltévedsz, míg végül valami nehéz esik rád a magasból. Rémülten');
+      printDeath('veszed észre, hogy egy óriáskígyó az. Összeroppantja csontjaidat, és egyben lenyel.');
+      state.a = 1;
+    }
+    if (p === 'k') {
+      printDeath('Össze-vissza szaladgálsz, míg egyszer csak belerohansz valami ragacsosba.');
+      printDeath('Egy óriási pókháhóban vagy. A pók egyre közelebb jön, míg végül nyakadba');
+      printDeath('mélyeszti csápjait és mérgét beléd ereszti. Pár nap múlva már csak oldott pép leszel.');
+      state.a = 1;
+    }
+  }
+};
+
+// --- a=79: Bennszülöttek (cutscene) ---
+rooms[79] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A bennszülöttek falujába érkeztél. 15-20 kunyhóból áll az egész. Amint meglátnak');
+      println('azonnal a főnökükhöz visznek. Ő így szól:');
+      println('-Biztos azért jöttél, hogy a Nagy Cthulhu felébredését megakadályozd.');
+      println('Nem tudod, mi a fenéről beszél, de azért végighallgatod.');
+      println('-Tudd meg, hogy nagyon kevés az esélyed. Amióta a Gonosz Mágus először járt itt,');
+      println(' káosz és pusztulás jött a világra. Segítünk neked, de embereimet nem küldöm');
+      println(' veled. Mi nem vagyunk olyan őrültek, hogy Cthulhu haragját magunkra vállaljuk.');
+      println(' De megmutatjuk az utat: 5 legkiválóbb harcosom fog téged a szentélyhez vinni.');
+      println(' A vulkánnál kell leereszkednetek.');
+      println('-De arra olyan meleg van, hogy majdnem megsültem! Hogyan védekeztek a hő ellen?');
+      println(' Vizes rongyokat csavartok magatok köré?');
+      println('-Nem. Hőálló védőruhákkal.');
+      println('Hát hiába. Már az elszigetelt bennszülöttek is haladnak a korral. Megkapod');
+      println('a védőruhádat, és öt kísérőddel elindulsz a hegy felé.');
+      state.radsuit = true;
+      addItem('védőruha');
+      state.a = 80; state.otth = 0;
+    }
+  },
+  command() {}
+};
+
+// --- a=80: Vulkán ---
+rooms[80] = {
+  describe() {
+    if (!state.radsuit) {
+      println('A talaj itt olyan forró, hogy vissza kell fordulnod.');
+      state.a = 77;
+      return;
+    }
+    if (state.otth === 0) {
+      println('A harcosok felvezetnek a hegy oldalán, és a kráter belsejében egy peremre');
+      println('leszel figyelmes. Ezen mentek egyre lejjebb, míg szinte karnyújtásnyira van');
+      println('alattad a láva. Ekkor egy barlang bejáratára mutatnak, és ott hagynak.');
+      println('Bemász a barlangba. A barlang lefelé vezet, több kilométeren át. Hosszú órák');
+      println('után végre meglátod a másik végét. Egy magas sziklafal tetején vagy, alattad');
+      println('több száz méterre van a földfelszín. Veled szembe egy gigantikus építmény van,');
+      println('az oldalán félelmetes dombormű: azokat a lényeket ábrázolja, amelyek a');
+      println('táborodat megtámadták, amint körbeállnak és imádnak egy polipszerű lényt.');
+      println('Vagyis csak a feje olyan mint egy polipé, rengeteg csáppal. A teste humanoid,');
+      println('leszámítva azt a két denevérszárnyat a hátán.');
+      println('Amint az égre pillantasz, a lélegzeted is eláll. Ugyanis a fejed felett a');
+      println('tenger van. Fel nem tudod fogni, hogyan lehetséges, hogy ezt a területet nem');
+      println('érinti a víz. Most viszont egy utat kell találnod, hogy lejuss innen.');
+      state.otth = 1;
+    }
+  },
+  command() {
+    const p = state.para;
+    state.vara = true; state.ker = false;
+    if (p === 'é') println('Minek akarsz visszamenni, ha már eddig jutottál?');
+    if (p === 'k' || p === 'ny' || p === 'd') {
+      printDeath('Megpróbálsz lejutni, de megcsúszol. Hosszan zuhansz, amíg egy puffanással véget ér életed.');
+      state.a = 1;
+    }
+    if (p === 'vár' || p === 'var') {
+      if (!state.oreg) {
+        println('Nem történik semmi.');
+      } else {
+        println('Leülsz gondolkozni, hogyan juthatnál el innen. Amíg ezen töröd a fejed, gyors');
+        println('lépteket hallasz a barlangból. Megfordulsz, és egy ősz hajú embert látsz feléd');
+        println('rohanni. Felismered benne a FoD könyvtárosát.');
+        if (state.levett) {
+          state.a = 81; state.otth = 0;
+        } else {
+          printDeath('Meglát ő is, és elkezd reszketni. Persze, hiszen nem ismer fel a védőruha');
+          printDeath('alatt. Kétségbeesésében neked rohan, és mindketten lezuhantok.');
+          state.a = 1;
+        }
+      }
+    }
+  }
+};
+
+// --- a=81: Végső jelenet (Cthulhu) ---
+rooms[81] = {
+  describe() {
+    if (state.otth === 0) {
+      println('A könyvtáros is észrevesz, és felismer.');
+      println('-Te hogy kerülsz ide?');
+      println('-Ugyanezt akartam kérdezni magától.');
+      println('-A könyv, amit elvettem tőled. Mégsem semmisítettem meg, hanem elolvastam.');
+      println(' Kiszámítottam belőle, hogy a mai napra van jósolva Cthulhu felébredése. Ezért');
+      println(' jöttem ide egy teleporttal. De most sietnünk kell, mert nincs sok időnk. Ha a');
+      println(' rettenetes Cthulhu felébred, újra az öregek fogják uralni a világot!');
+      println('Ebből megint csak nem értettél egy büdös szót se, de már megint ez a nyelvtörő');
+      println('Cthulhu-t emlegetik. A könyvtáros szemrevételezi a helyzetet, és így szól:');
+      println('-Egy újabb teleport kapuval könnyen lejutunk.');
+      println('Elővesz egy krétát a zsebéből, és egy pentagrammát rajzol a földre.');
+      println('-Lépj bele, gyorsan! Nem késlekedhetünk!');
+      println('Belépsz a pentagrammába, ő mellé. Erre előveszi a könyvedet és furcsa szavakat');
+      println('kezd kántálni:');
+      println('-Iä! Ngah Cthulhu! Ygnaiiih...Ygnaiiih...Yog-Sothoth! Eh-ya-ya-ya-yahahaaa!');
+      println('Egy villanás, és ott álltok a monstrum épület kapui előtt. A könyvtáros kelet');
+      println('felé fut.');
+      println('-Gyere már! Meg kell mentenünk a világot!');
+      println('Mi mást tehetnél, futsz utána. Egy (az előbbihez képest) kicsi kőépülethez');
+      println('értek. A könyvtáros befut. Egyszer csak egy lövést hallasz bentről. Mire');
+      println('odaérsz, a könyvtárost látod eldőlni, kezében a nyitott könyvvel. Vele szemben');
+      println('a császár áll egy pisztollyal.');
+      println('-Shaddam!');
+      println('-Már vártalak. Adok neked valamit.');
+      println('Ebben a pillanatban hallod, amint a gigászi építmény kapui kinyílnak.');
+      println('');
+      printSystem('[ Nyomj ENTER-t a folytatáshoz ]');
+      state.otth = 1;
+      state._vegContinue1 = true;
+    }
+  },
+  command() {
+    if (state._vegContinue1) {
+      state._vegContinue1 = false;
+      println('');
+      println('A föld elkezd remegni, és egy óriási lény lép ki az épületből. A fején miriádnyi');
+      println('csáp tekergőzik, ujjai végén a karmok nagyobbak, mint egy ember. Felismered,');
+      println('hogy ő a lény a domborműről. Shaddam sátáni kacajt hallat.');
+      println('-A világot már nem mentheted meg! Vége! Ha az enyém nem lesz, senkié sem lesz!');
+      println('Dühvel eltelve nekirontasz. Annyira gyorsan történik mindez, hogy nincs ideje');
+      println('rád lőni. Egy mozdulattal eltöröd a nyakát.');
+      println('A diktátor, a népsanyargató halott. De nincs időd örvendezni. Kint még egy próba');
+      println('vár rád. Kirohansz az épületből, kezedben a Necronomiconnal.');
+      println('-Hé te polipfejű! -ordítod teljes erődből. A szörny rád néz, és elindul feléd.');
+      println('Gyorsan belenézel a könyvbe. Reméled, a könyvtáros jó helyen nyitotta ki. A');
+      println('szörny egyre közelebb jön. Elkezded olvasni ami a könyvben van:');
+      println('-Iä Cthulhu! Iä Shub-Niggurath!.... -a csápok köréd fonódnak.');
+      println('-Ygnaiiih! Ygnaiiih! Yog-Sothoth! Eh-y-ya-ya-ya-yahahaaa! -egyre közelebb');
+      println('kerülsz a szájához.');
+      println('-EsdkjhfjNBVHGR=/()+=">@#!!!');
+      println('Mikor ezt a mágikus formulát kimondod, a szörny felordít, majd zsugorodni kezd.');
+      println('-ECDVNH?JM?öö>$üüü~+/!TZSDFfsetr34%+!%!+"%"VXCGVEWRZT!!!!!!!');
+      println('A lény ekkor már csak fél méteres. Mikor befejezed a formulát, egy hiéna jelenik');
+      println('meg, és megeszi a szörnyet. Hatalmas fény tölt be mindent.');
+      println('');
+      printSystem('[ Nyomj ENTER-t a folytatáshoz ]');
+      state._vegContinue2 = true;
+      return;
+    }
+    if (state._vegContinue2) {
+      state._vegContinue2 = false;
+      println('');
+      println('Mikor magadhoz térsz, a szigeten vagy. A bennszülöttek között élsz pár hónapig,');
+      println('aztán kiköt egy hajó és elvisznek erről a borzalmas helyről.');
+      println('A civilizált világban megtudod, mi történt az utóbbi időben.');
+      println('Shaddam eltűnt, a maradék seregét a FoD szétverte. A nép felszabadult, nem kell');
+      println('többé robotolnia. A FoD katonái alatt újabb aranykor köszöntött a Földlakókra.');
+      println('A tudományok és művészetek virágzanak. Minden jóra fordult.');
+      println('Ami téged illet, kapsz egy birtokot a FoD kincstártól. Családot alapítasz és az');
+      println('életed gondtalanul folytatódik. Csak egyvalami árnyékolja be hátralévő éveidet:');
+      println('a tudat, hogy a tenger mélyén olyan borzalmak alusszák évezredes álmukat, hogy');
+      println('inkább lennél halott, minthogy megéld azt a napot, amikor újra elszabadulnak.');
+      println('');
+      println('(Képzelj ide valami hátborzongató zenét.)');
+      println('');
+      println('BlackEvil a FoD vezére új veszélyeket is lát. Valószínűleg az űrből idegen fajok');
+      println('fognak támadni és ez nem jelent mást mint --> DESERT WIND 2!!!');
+      println('"Vigyázz a hiéna beléd harap!!!"');
+      println('Nemsokára a boltokban!');
+      println('');
+      println('Ezenkívül rendeld meg most kedvezményes áron a Heroes of Desert Wind nevű');
+      println('stratégiai játékunkat!');
+      println('És készülj fel a fergeteges, mindent elsöprő Desert Wind Online-ra!');
+      println('');
+      printSystem('Copyright FoD Softworks Inc.');
+      printSystem('All rights reserved');
+      println('');
+      printSuccess('══════════════════════════════════════════════');
+      printSuccess('  GRATULÁLOK! SIKERÜLT MEGMENTENED A VILÁGOT!');
+      printSuccess('══════════════════════════════════════════════');
+      println('');
+      printSystem('Készítők:');
+      println('Történet: Solt Zoltán, Kökkői László');
+      println('Intro, Outro: Kökkői László');
+      println('Szöveges felület: Solt Zoltán');
+      println('Teszterek: Mester Gábor');
+      println('');
+      println('Köszönet illeti még a WasteLandet, a Falloutot.');
+      println('Köszönet mindenkinek aki végig vitte.');
+      println('Remélem tetszett a játék. Sok munkánk volt vele.');
+      println('Természetesen külön köszönet: Fifinek a hiénának......');
+      println('');
+      printSystem('[ A játék véget ért. Köszönjük hogy játszottál! ]');
+      state.a = 0;
+    }
+  }
+};
+
+// Induló állapot
+updateInventory();
+</script>
+</body>
+</html>
