@@ -11,6 +11,8 @@
 <meta name="theme-color" content="#ffb000">
 <meta name="description" content="Desert Wind - Retro CRT terminál kalandjáték">
 <link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -584,11 +586,29 @@ function startPorzas() {
 }
 
 // Font betöltés megvárása, aztán rajzolás
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(() => drawIntro());
-} else {
-  setTimeout(drawIntro, 500);
+// FONTOS: document.fonts.ready nem elég - explicit load() kell, mert
+// a böngésző csak akkor tölti le a webfont-ot, ha valami használja.
+// Canvas rajzolás nem triggereli a font letöltést, ezért itt kényszerítjük.
+function waitForFontsAndDraw() {
+  if (document.fonts && document.fonts.load) {
+    Promise.all([
+      document.fonts.load('bold 28px "Press Start 2P"'),
+      document.fonts.load('14px "Press Start 2P"'),
+      document.fonts.load('12px "Press Start 2P"')
+    ]).then(() => {
+      // Extra biztonság: a ready-re is várunk
+      return document.fonts.ready;
+    }).then(() => {
+      drawIntro();
+    }).catch(() => {
+      // Ha valami hiba lenne, rajzoljunk mindenképp fallback fonttal
+      drawIntro();
+    });
+  } else {
+    setTimeout(drawIntro, 800);
+  }
 }
+waitForFontsAndDraw();
 
 // Intro billentyűzettel is indítható (mint az eredeti ReadKey)
 document.addEventListener('keydown', function introKey(e) {
